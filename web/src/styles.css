@@ -1,1 +1,127 @@
 @import "tailwindcss";
+
+@theme {
+  --color-paper: var(--paper);
+  --color-paper-2: var(--paper-2);
+  --color-surface: var(--surface);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-brass: var(--brass);
+  --color-ok: var(--ok);
+  --color-warn: var(--warn);
+  --color-danger: var(--danger);
+  --color-info: var(--info);
+  --font-display: Fraunces, "Noto Serif SC", serif;
+  --font-ui: Inter, "Noto Sans SC", sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+}
+
+:root {
+  --paper: #F4F0E7;
+  --paper-2: #EBE5D8;
+  --surface: #FBF9F4;
+  --ink: #15211C;
+  --ink-2: #4A5650;
+  --line: #D9D2C2;
+  --accent: #1F4D3A;
+  --accent-ink: #F4F0E7;
+  --brass: #B07A1E;
+  --ok: #2E7D5B;
+  --warn: #B7791F;
+  --danger: #B3372B;
+  --info: #2F5D8A;
+  color-scheme: light;
+}
+
+[data-theme="dark"] {
+  --paper: #0F1714;
+  --paper-2: #101A16;
+  --surface: #16211D;
+  --ink: #E8E4D8;
+  --ink-2: #9AA79F;
+  --line: #2A3A34;
+  --accent: #6FB38F;
+  --accent-ink: #0F1714;
+  --brass: #D9A441;
+  --ok: #5FBF8F;
+  --warn: #E0A640;
+  --danger: #E5675A;
+  --info: #7EA8D6;
+  --surface-2: #1D2B26;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: Inter, "Noto Sans SC", sans-serif;
+  letter-spacing: 0;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--line) 34%, transparent) 1px, transparent 1px) 0 0 / 72px 72px,
+    var(--paper);
+  color: var(--ink);
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button,
+a,
+input,
+select,
+textarea,
+[tabindex]:not([tabindex="-1"]) {
+  outline: none;
+}
+
+:focus-visible {
+  outline: 2px solid var(--brass);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: var(--brass);
+  color: var(--ink);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+.font-tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+.qa-kiosk {
+  font-size: 20px;
+}
+
+.qa-kiosk button,
+.qa-kiosk input,
+.qa-kiosk select {
+  min-height: 64px;
+}

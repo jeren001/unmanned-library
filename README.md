@@ -30,3 +30,7 @@ npm run build
 npm test
 npm run lint
 ```
+
+## Documentation
+
+- [docs/DEMO_ACCOUNTS.md](docs/DEMO_ACCOUNTS.md) — demo logins for each role (reader / librarian / admin)

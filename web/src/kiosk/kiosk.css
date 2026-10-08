@@ -1,0 +1,1180 @@
+.kiosk-page {
+  --kiosk-forest: #163c2d;
+  --kiosk-forest-deep: #10281e;
+  --kiosk-brass: #b47a20;
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 20px;
+}
+
+.kiosk-idle-scan-buffer {
+  position: fixed;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.kiosk-page button,
+.kiosk-page input {
+  font: inherit;
+}
+
+.kiosk-topbar {
+  position: relative;
+  z-index: 2;
+  min-height: 92px;
+  padding: 14px clamp(18px, 3vw, 48px);
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.kiosk-logo-button,
+.kiosk-icon-button,
+.kiosk-exit,
+.kiosk-back {
+  border: 0;
+  cursor: pointer;
+  color: var(--ink);
+  background: transparent;
+}
+
+.kiosk-logo-button {
+  padding: 0;
+  touch-action: none;
+}
+
+.kiosk-topbar .qa-logo {
+  width: 60px;
+  height: 60px;
+  border-color: var(--line);
+  border-radius: 8px;
+}
+
+.kiosk-branch {
+  display: grid;
+  gap: 3px;
+}
+
+.kiosk-branch strong {
+  font-family: Fraunces, "Noto Serif SC", serif;
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.kiosk-branch span {
+  color: var(--ink-2);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 12px;
+}
+
+.kiosk-top-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.kiosk-icon-button {
+  width: 64px;
+  height: 64px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.kiosk-exit {
+  min-height: 64px;
+  padding: 0 14px;
+  color: var(--ink-2);
+}
+
+.kiosk-exit span,
+.kiosk-exit small {
+  display: block;
+}
+
+.kiosk-exit small {
+  font-size: 12px;
+}
+
+.kiosk-offline-banner,
+.kiosk-reconcile {
+  position: relative;
+  z-index: 3;
+  min-height: 54px;
+  padding: 8px 24px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  color: #5a3b0d;
+  border-bottom: 1px solid #d9b568;
+  background: #f3e5c5;
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.kiosk-offline-banner svg,
+.kiosk-reconcile svg {
+  width: 22px;
+  height: 22px;
+}
+
+.kiosk-reconcile {
+  justify-content: flex-start;
+  background: #f7e2dd;
+  color: var(--danger);
+}
+
+.kiosk-reconcile button {
+  margin-left: auto;
+  width: 48px;
+  height: 48px;
+  border: 0;
+  background: transparent;
+}
+
+.kiosk-reconcile button svg {
+  width: 24px;
+}
+
+.kiosk-idle {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(300px, 0.95fr);
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--line) 30%, transparent) 1px, transparent 1px) 0 0 / 84px 84px,
+    var(--paper);
+}
+
+.kiosk-idle-copy {
+  align-self: center;
+  padding: 48px clamp(28px, 6vw, 104px);
+}
+
+.kiosk-eyebrow {
+  margin: 0 0 22px;
+  color: var(--brass);
+  font: 14px "JetBrains Mono", monospace;
+}
+
+.kiosk-idle h1 {
+  margin: 0;
+  font: 600 clamp(48px, 6.3vw, 92px)/1.04 Fraunces, "Noto Serif SC", serif;
+}
+
+.kiosk-idle h1 small {
+  display: block;
+  margin-top: 12px;
+  color: var(--ink-2);
+  font: 500 24px/1.3 Inter, "Noto Sans SC", sans-serif;
+}
+
+.kiosk-clock {
+  margin-top: 32px;
+  color: var(--accent);
+  font: 500 clamp(64px, 8vw, 112px)/1 "JetBrains Mono", monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+.kiosk-presence {
+  margin: 24px 0 30px;
+  font-size: 23px;
+  line-height: 1.55;
+}
+
+.kiosk-presence strong {
+  color: var(--accent);
+  font: 600 1.28em "JetBrains Mono", monospace;
+}
+
+.kiosk-presence small {
+  color: var(--ink-2);
+}
+
+.kiosk-start {
+  width: min(100%, 620px);
+  min-height: 88px;
+  padding: 12px 26px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  border: 1px solid var(--kiosk-forest);
+  border-radius: 6px;
+  background: var(--kiosk-forest);
+  color: #fffdf8;
+  text-align: left;
+  cursor: pointer;
+}
+
+.kiosk-start > span:first-child,
+.kiosk-start small {
+  display: block;
+}
+
+.kiosk-start small {
+  margin-top: 4px;
+  color: #e0e7df;
+  font-size: 15px;
+}
+
+.kiosk-start > span:last-child {
+  font-size: 36px;
+}
+
+.kiosk-idle-art {
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  min-height: 400px;
+  background:
+    repeating-linear-gradient(90deg, transparent 0 27px, rgba(255,255,255,.12) 27px 29px),
+    linear-gradient(145deg, #315a45, #183b2d 62%, #10281e);
+}
+
+.kiosk-idle-art::before {
+  content: "";
+  position: absolute;
+  left: -12%;
+  right: -12%;
+  bottom: 11%;
+  height: 2px;
+  background: rgba(245, 240, 226, .42);
+  transform: rotate(-5deg);
+}
+
+.kiosk-idle-art .qa-spines {
+  width: min(75%, 520px);
+  height: min(50vh, 550px);
+  color: #ede5d2;
+  animation: kiosk-shelf-breathe 7s ease-in-out infinite alternate;
+}
+
+.kiosk-idle-art .qa-spines line {
+  stroke: rgba(241, 234, 217, .3);
+}
+
+.kiosk-idle-art .qa-spines rect {
+  fill: currentColor;
+}
+
+.kiosk-art-label {
+  position: absolute;
+  right: 36px;
+  bottom: 28px;
+  color: #eee5d2;
+  font: 13px/1.5 "JetBrains Mono", monospace;
+  text-align: right;
+}
+
+.kiosk-art-label span {
+  opacity: .65;
+}
+
+@keyframes kiosk-shelf-breathe {
+  to { transform: translateY(-8px); opacity: .8; }
+}
+
+.kiosk-shell {
+  width: min(100%, 1420px);
+  flex: 1;
+  min-height: 0;
+  margin: 0 auto;
+  padding: 28px clamp(18px, 4vw, 56px) 36px;
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+}
+
+.kiosk-shell-heading {
+  min-height: 72px;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.kiosk-shell-heading h1 {
+  margin: 0;
+  font: 600 38px/1.08 Fraunces, "Noto Serif SC", serif;
+}
+
+.kiosk-shell-heading h1 small {
+  display: block;
+  margin-top: 5px;
+  color: var(--ink-2);
+  font: 500 16px Inter, "Noto Sans SC", sans-serif;
+}
+
+.kiosk-back {
+  width: 64px;
+  height: 64px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--accent);
+  font-size: 32px;
+}
+
+.kiosk-identify {
+  width: min(100%, 670px);
+  margin: auto;
+  padding: 32px;
+  display: grid;
+  gap: 20px;
+  text-align: center;
+}
+
+.kiosk-scan-mark {
+  width: 116px;
+  height: 116px;
+  margin: 0 auto;
+  display: grid;
+  place-items: center;
+  border: 2px solid var(--accent);
+  border-radius: 50%;
+  color: var(--accent);
+  font-size: 78px;
+  line-height: 1;
+}
+
+.kiosk-identify h2,
+.kiosk-tray h2 {
+  margin: 0;
+  font: 600 30px/1.35 Fraunces, "Noto Serif SC", serif;
+}
+
+.kiosk-identify h2 small,
+.kiosk-tray p {
+  display: block;
+  margin-top: 7px;
+  color: var(--ink-2);
+  font: 500 17px Inter, "Noto Sans SC", sans-serif;
+}
+
+.kiosk-scan-input,
+.kiosk-pin-field input,
+.kiosk-manual-row input,
+.kiosk-search-row input {
+  width: 100%;
+  min-width: 0;
+  min-height: 72px;
+  padding: 0 18px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 24px;
+}
+
+.kiosk-pin-field {
+  display: grid;
+  gap: 8px;
+  color: var(--ink-2);
+  text-align: left;
+  font-size: 16px;
+}
+
+.kiosk-identify .qa-button {
+  min-height: 72px;
+  font-size: 22px;
+}
+
+.kiosk-hint {
+  margin: 0;
+  color: var(--ink-2);
+  line-height: 1.55;
+}
+
+.kiosk-hint small {
+  font-size: 15px;
+}
+
+.kiosk-error {
+  margin: 0;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid color-mix(in srgb, var(--danger) 44%, var(--line));
+  border-radius: 6px;
+  color: #81271f;
+  background: #f7e8e3;
+  font-size: 17px;
+}
+
+.kiosk-error svg {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+}
+
+.kiosk-home {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: clamp(20px, 4vh, 38px);
+}
+
+.kiosk-greeting {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.kiosk-greeting h1 {
+  margin: 0;
+  font: 600 46px/1.05 Fraunces, "Noto Serif SC", serif;
+}
+
+.kiosk-greeting h1 small {
+  display: block;
+  margin-top: 8px;
+  color: var(--ink-2);
+  font: 500 17px Inter, "Noto Sans SC", sans-serif;
+}
+
+.kiosk-greeting p {
+  margin: 0;
+  color: var(--ink-2);
+  text-align: right;
+  line-height: 1.5;
+}
+
+.kiosk-greeting p span {
+  font-size: 15px;
+}
+
+.kiosk-summary {
+  display: flex;
+  gap: 0;
+  border-block: 1px solid var(--line);
+  background: color-mix(in srgb, var(--surface) 72%, transparent);
+}
+
+.kiosk-summary > div {
+  min-width: 0;
+  flex: 1;
+  min-height: 86px;
+  padding: 12px 22px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.kiosk-summary > div + div {
+  border-left: 1px solid var(--line);
+}
+
+.kiosk-summary strong {
+  color: var(--accent);
+  font: 600 38px "JetBrains Mono", monospace;
+}
+
+.kiosk-summary span {
+  color: var(--ink-2);
+  font-size: 17px;
+}
+
+.kiosk-summary .is-warn strong { color: #89580d; }
+.kiosk-summary .is-danger strong { color: #8d2b23; }
+
+.kiosk-action-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.kiosk-action-grid button {
+  min-height: clamp(132px, 19vh, 188px);
+  padding: 20px 22px;
+  display: grid;
+  align-content: center;
+  justify-items: start;
+  gap: 5px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 180ms ease-out, background-color 180ms ease-out, transform 180ms ease-out;
+}
+
+.kiosk-action-grid button:active {
+  transform: translateY(2px);
+}
+
+.kiosk-action-grid button:first-child {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.kiosk-action-grid b {
+  min-height: 42px;
+  color: var(--brass);
+  font: 500 38px/1 "JetBrains Mono", monospace;
+}
+
+.kiosk-action-grid button:first-child b { color: #e3bd72; }
+
+.kiosk-action-grid span {
+  font: 600 27px Fraunces, "Noto Serif SC", serif;
+}
+
+.kiosk-action-grid small {
+  font-size: 15px;
+  opacity: .78;
+}
+
+.kiosk-flow {
+  width: min(100%, 1050px);
+  flex: 1;
+  margin: 0 auto;
+  padding-top: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.kiosk-stepper {
+  display: flex;
+  gap: 10px;
+}
+
+.kiosk-stepper span {
+  flex: 1;
+  min-height: 54px;
+  padding: 10px;
+  display: grid;
+  place-items: center;
+  border-bottom: 2px solid var(--line);
+  color: var(--ink-2);
+  font-size: 16px;
+}
+
+.kiosk-stepper .active {
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.kiosk-tray {
+  min-height: 260px;
+  padding: 22px;
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 10px;
+  border: 1px dashed #9a9a7c;
+  border-radius: 8px;
+  background:
+    repeating-linear-gradient(0deg, transparent 0 30px, color-mix(in srgb, var(--line) 26%, transparent) 30px 31px),
+    color-mix(in srgb, var(--surface) 78%, var(--paper-2));
+  text-align: center;
+}
+
+.kiosk-tray.compact {
+  min-height: 176px;
+}
+
+.kiosk-tray-ring {
+  width: 74px;
+  height: 74px;
+  display: grid;
+  place-items: center;
+  border: 2px solid var(--brass);
+  border-radius: 50%;
+  color: var(--brass);
+  font: 15px "JetBrains Mono", monospace;
+  animation: kiosk-rfid-pulse 2.4s ease-out infinite;
+}
+
+@keyframes kiosk-rfid-pulse {
+  50% { box-shadow: 0 0 0 13px color-mix(in srgb, var(--brass) 13%, transparent); }
+}
+
+.kiosk-tray p {
+  margin: 0;
+}
+
+.kiosk-manual-row,
+.kiosk-search-row {
+  width: min(100%, 650px);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.kiosk-manual-row button,
+.kiosk-search-row button {
+  min-width: 154px;
+  min-height: 72px;
+  padding: 0 18px;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--accent);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.kiosk-book-list,
+.kiosk-loan-list,
+.kiosk-reserve-list {
+  display: grid;
+  gap: 8px;
+}
+
+.kiosk-book-card,
+.kiosk-loan-card {
+  min-height: 86px;
+  padding: 11px 16px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+}
+
+.kiosk-spine {
+  width: 12px;
+  min-height: 60px;
+  align-self: stretch;
+  flex: 0 0 auto;
+  border-radius: 2px;
+}
+
+.kiosk-book-card > div,
+.kiosk-loan-main {
+  min-width: 0;
+  flex: 1;
+  display: grid;
+  gap: 4px;
+}
+
+.kiosk-book-card strong,
+.kiosk-loan-main strong {
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 19px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kiosk-book-card span:not(.kiosk-spine),
+.kiosk-loan-main span {
+  color: var(--ink-2);
+  font-size: 15px;
+}
+
+.kiosk-book-card code {
+  color: var(--ink-2);
+  font: 12px "JetBrains Mono", monospace;
+}
+
+.kiosk-book-card > button {
+  width: 56px;
+  height: 56px;
+  flex: 0 0 auto;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink-2);
+}
+
+.kiosk-book-card > button svg,
+.kiosk-check {
+  width: 25px;
+  height: 25px;
+}
+
+.kiosk-check {
+  color: var(--ok);
+  animation: kiosk-check-in 240ms ease-out both;
+}
+
+@keyframes kiosk-check-in {
+  from { opacity: 0; transform: scale(.4) rotate(-25deg); }
+  to { opacity: 1; transform: scale(1) rotate(0); }
+}
+
+.kiosk-rule-hints {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px 28px;
+  color: var(--ink-2);
+  font-size: 15px;
+}
+
+.kiosk-rule-hints span + span::before {
+  content: "·";
+  margin-right: 16px;
+  color: var(--brass);
+}
+
+.kiosk-subheading,
+.kiosk-section-intro {
+  margin: 0;
+  font: 600 23px Fraunces, "Noto Serif SC", serif;
+}
+
+.kiosk-flow-actions {
+  margin-top: auto;
+  padding-top: 12px;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.kiosk-flow-actions > button:not(.qa-button) {
+  min-height: 68px;
+  padding: 0 22px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink-2);
+}
+
+.kiosk-flow-actions .qa-button,
+.kiosk-loan-card > button,
+.kiosk-book-card > button:not([aria-label]) {
+  min-height: 68px;
+  padding: 0 22px;
+  border-radius: 6px;
+  font-size: 19px;
+}
+
+.kiosk-loan-card {
+  min-height: 92px;
+}
+
+.kiosk-loan-card > button {
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: var(--accent-ink);
+  cursor: pointer;
+}
+
+.kiosk-loan-card > button:disabled {
+  opacity: .55;
+}
+
+.kiosk-checkable {
+  cursor: pointer;
+}
+
+.kiosk-checkable input {
+  width: 28px;
+  height: 28px;
+  accent-color: var(--accent);
+}
+
+.kiosk-checkable em {
+  color: #81271f;
+  font-size: 14px;
+  font-style: normal;
+}
+
+.kiosk-checkable.is-blocked {
+  background: color-mix(in srgb, var(--paper-2) 55%, var(--surface));
+}
+
+.kiosk-new-date {
+  min-width: 90px;
+  color: var(--accent);
+  font: 18px "JetBrains Mono", monospace;
+}
+
+.kiosk-date {
+  display: grid;
+  gap: 3px;
+  color: var(--ink-2);
+  font-size: 14px;
+  text-align: right;
+}
+
+.kiosk-date strong {
+  color: var(--ink);
+  font: 18px "JetBrains Mono", monospace;
+}
+
+.kiosk-date small,
+.kiosk-date.is-danger { color: var(--danger); }
+.kiosk-date.is-warn { color: #89580d; }
+
+.kiosk-search-row {
+  width: 100%;
+}
+
+.kiosk-reserve-list .kiosk-book-card {
+  min-height: 104px;
+}
+
+.kiosk-empty {
+  min-height: 180px;
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 12px;
+  color: var(--ink-2);
+}
+
+.kiosk-empty .qa-spines {
+  width: 120px;
+  height: 78px;
+  color: var(--brass);
+}
+
+.kiosk-empty .qa-spines line {
+  stroke: currentColor;
+}
+
+.kiosk-empty .qa-spines rect {
+  fill: currentColor;
+}
+
+.kiosk-help {
+  width: min(100%, 850px);
+  flex: 1;
+  margin: auto;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 28px;
+  text-align: center;
+}
+
+.kiosk-help-steps {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border-block: 1px solid var(--line);
+}
+
+.kiosk-help-steps div {
+  min-height: 140px;
+  display: grid;
+  place-content: center;
+  gap: 10px;
+}
+
+.kiosk-help-steps div + div {
+  border-left: 1px solid var(--line);
+}
+
+.kiosk-help-steps b {
+  color: var(--brass);
+  font: 48px "JetBrains Mono", monospace;
+}
+
+.kiosk-help p {
+  font-size: 26px;
+  line-height: 1.45;
+}
+
+.kiosk-help p small {
+  color: var(--ink-2);
+  font-size: 17px;
+}
+
+.kiosk-help .qa-button {
+  min-height: 76px;
+  font-size: 21px;
+}
+
+.kiosk-result {
+  width: min(100%, 850px);
+  flex: 1;
+  margin: auto;
+  padding: 32px;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 18px;
+  text-align: center;
+}
+
+.kiosk-result-mark {
+  width: 104px;
+  height: 104px;
+  display: grid;
+  place-items: center;
+  border: 2px solid var(--ok);
+  border-radius: 50%;
+  color: var(--ok);
+}
+
+.kiosk-result-mark.offline,
+.kiosk-result-mark.warning {
+  border-color: var(--brass);
+  color: var(--brass);
+}
+
+.kiosk-result-mark svg {
+  width: 58px;
+  height: 58px;
+}
+
+.kiosk-result h1 {
+  margin: 0;
+  font: 600 38px/1.2 Fraunces, "Noto Serif SC", serif;
+}
+
+.kiosk-result > p {
+  margin: 0;
+  color: var(--ink-2);
+}
+
+.kiosk-result-items {
+  width: 100%;
+  display: grid;
+  gap: 8px;
+}
+
+.kiosk-result-items div {
+  min-height: 66px;
+  padding: 12px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+}
+
+.kiosk-result-items span {
+  color: var(--accent);
+}
+
+.kiosk-result .kiosk-start {
+  margin-top: 10px;
+}
+
+.kiosk-timeout {
+  position: fixed;
+  z-index: 12;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(16, 40, 30, .46);
+}
+
+.kiosk-timeout > div {
+  width: min(100%, 540px);
+  padding: 36px;
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  text-align: center;
+}
+
+.kiosk-timeout svg {
+  width: 46px;
+  height: 46px;
+  color: var(--brass);
+}
+
+.kiosk-timeout h2 {
+  margin: 0;
+}
+
+.kiosk-timeout p {
+  color: var(--ink-2);
+}
+
+.kiosk-timeout button {
+  min-height: 68px;
+  padding: 0 24px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.kiosk-dev-drawer {
+  position: fixed;
+  z-index: 15;
+  inset: auto 0 0;
+  padding: 20px clamp(20px, 4vw, 56px) 28px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  border-top: 2px solid var(--brass);
+  background: #12251c;
+  color: #f4f0e7;
+  box-shadow: 0 -12px 40px rgba(0, 0, 0, .24);
+}
+
+.kiosk-dev-head {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font: 14px "JetBrains Mono", monospace;
+}
+
+.kiosk-dev-head button {
+  width: 48px;
+  height: 48px;
+  border: 1px solid #637269;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+}
+
+.kiosk-dev-head button svg {
+  width: 22px;
+}
+
+.kiosk-dev-drawer p {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: #bdc9bf;
+  font-size: 14px;
+}
+
+.kiosk-dev-drawer > button {
+  min-height: 64px;
+  padding: 8px 12px;
+  border: 1px solid #68786e;
+  border-radius: 4px;
+  background: #1d382a;
+  color: #f4f0e7;
+  font-size: 15px;
+}
+
+@media (orientation: landscape) and (min-width: 850px) {
+  .kiosk-shell {
+    width: min(100%, 1600px);
+  }
+
+  .kiosk-home {
+    gap: 20px;
+  }
+
+  .kiosk-action-grid button {
+    min-height: clamp(104px, 16vh, 150px);
+  }
+
+  .kiosk-flow {
+    width: min(100%, 1320px);
+  }
+
+  .kiosk-flow:has(.kiosk-tray) {
+    display: grid;
+    grid-template-columns: minmax(0, 1.1fr) minmax(330px, .9fr);
+    grid-template-rows: auto 1fr auto auto;
+    align-content: stretch;
+  }
+
+  .kiosk-stepper,
+  .kiosk-flow-actions,
+  .kiosk-flow > .kiosk-error {
+    grid-column: 1 / -1;
+  }
+
+  .kiosk-book-list {
+    align-content: start;
+  }
+
+  .kiosk-tray {
+    min-height: 300px;
+  }
+}
+
+@media (orientation: portrait) and (min-height: 1200px) {
+  .kiosk-topbar { min-height: 108px; }
+  .kiosk-shell { padding-top: 42px; }
+  .kiosk-home { gap: 36px; }
+  .kiosk-action-grid button { min-height: 194px; }
+  .kiosk-tray { min-height: 330px; }
+}
+
+@media (max-width: 700px) {
+  .kiosk-page { font-size: 18px; }
+  .kiosk-topbar { min-height: 78px; padding: 8px 12px; gap: 10px; }
+  .kiosk-topbar .qa-logo { width: 48px; height: 48px; }
+  .kiosk-branch strong { font-size: 16px; }
+  .kiosk-branch span { font-size: 9px; }
+  .kiosk-icon-button { width: 48px; height: 48px; }
+  .kiosk-exit { min-height: 48px; padding: 0 5px; font-size: 13px; }
+  .kiosk-idle { grid-template-columns: 1fr; }
+  .kiosk-idle-copy { padding: 38px 22px 22px; }
+  .kiosk-idle-art { min-height: 220px; }
+  .kiosk-idle-art .qa-spines { height: 210px; }
+  .kiosk-clock { margin-top: 20px; }
+  .kiosk-presence { margin: 16px 0 20px; font-size: 18px; }
+  .kiosk-start { min-height: 72px; padding: 10px 16px; }
+  .kiosk-shell { padding: 16px 14px 20px; }
+  .kiosk-shell-heading h1 { font-size: 30px; }
+  .kiosk-greeting { align-items: start; flex-direction: column; gap: 10px; }
+  .kiosk-greeting p { text-align: left; font-size: 16px; }
+  .kiosk-summary > div { min-height: 72px; padding: 8px; gap: 6px; flex-direction: column; align-items: flex-start; }
+  .kiosk-summary strong { font-size: 28px; }
+  .kiosk-summary span { font-size: 12px; }
+  .kiosk-action-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .kiosk-action-grid button { min-height: 124px; padding: 12px; }
+  .kiosk-action-grid span { font-size: 22px; }
+  .kiosk-action-grid b { min-height: 32px; font-size: 30px; }
+  .kiosk-action-grid small { font-size: 12px; }
+  .kiosk-identify { padding: 18px 0; }
+  .kiosk-tray { padding: 14px; min-height: 250px; }
+  .kiosk-tray h2 { font-size: 22px; }
+  .kiosk-manual-row, .kiosk-search-row { grid-template-columns: 1fr; }
+  .kiosk-manual-row input, .kiosk-search-row input { min-height: 64px; font-size: 18px; }
+  .kiosk-manual-row button, .kiosk-search-row button { min-height: 64px; }
+  .kiosk-book-card { gap: 8px; padding: 9px; }
+  .kiosk-book-card strong, .kiosk-loan-main strong { font-size: 16px; }
+  .kiosk-book-card span:not(.kiosk-spine), .kiosk-loan-main span { font-size: 12px; }
+  .kiosk-rule-hints { gap: 6px 10px; font-size: 12px; }
+  .kiosk-loan-card { padding: 10px; gap: 8px; }
+  .kiosk-loan-card > button { min-height: 56px; padding: 0 10px; font-size: 14px; }
+  .kiosk-new-date { min-width: auto; font-size: 13px; }
+  .kiosk-flow-actions { flex-wrap: wrap; }
+  .kiosk-flow-actions > button { flex: 1; }
+  .kiosk-result { padding: 22px 8px; }
+  .kiosk-result h1 { font-size: 30px; }
+  .kiosk-dev-drawer { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 12px; }
+}
+
+@media (max-height: 760px) and (orientation: landscape) {
+  .kiosk-topbar { min-height: 72px; }
+  .kiosk-topbar .qa-logo { width: 48px; height: 48px; }
+  .kiosk-shell { padding-top: 12px; padding-bottom: 14px; }
+  .kiosk-shell-heading { min-height: 58px; }
+  .kiosk-shell-heading h1 { font-size: 28px; }
+  .kiosk-home { gap: 14px; }
+  .kiosk-greeting h1 { font-size: 34px; }
+  .kiosk-summary > div { min-height: 64px; }
+  .kiosk-summary strong { font-size: 30px; }
+  .kiosk-action-grid button { min-height: 100px; padding: 12px 16px; }
+  .kiosk-action-grid b { min-height: 30px; font-size: 28px; }
+  .kiosk-action-grid span { font-size: 21px; }
+  .kiosk-tray { min-height: 220px; }
+}

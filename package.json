@@ -10,7 +10,8 @@
     "dev": "concurrently \"npm run dev -w server\" \"npm run dev -w web\"",
     "build": "npm run build --workspaces",
     "test": "npm run test --workspaces",
-    "lint": "npm run lint --workspaces"
+    "lint": "npm run lint --workspaces",
+    "seed": "npm run seed -w server"
   },
   "devDependencies": {
     "concurrently": "^9.2.1",
