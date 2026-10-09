@@ -18,6 +18,10 @@ export function AlertIcon(props: IconProps) {
   return <IconBase {...props}><path d="M12 8v5" /><path d="M12 17h.01" /><path d="M10.3 4.2 2.7 17.4A2 2 0 0 0 4.4 20h15.2a2 2 0 0 0 1.7-2.6L13.7 4.2a2 2 0 0 0-3.4 0Z" /></IconBase>;
 }
 
+export function BellIcon(props: IconProps) {
+  return <IconBase {...props}><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" /><path d="M10 21h4" /></IconBase>;
+}
+
 export function InfoIcon(props: IconProps) {
   return <IconBase {...props}><circle cx="12" cy="12" r="9" /><path d="M12 11v5" /><path d="M12 8h.01" /></IconBase>;
 }
