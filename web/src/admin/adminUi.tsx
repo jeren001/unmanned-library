@@ -152,3 +152,19 @@ export function PageHeading({ eyebrow, title, subtitle, actions }: { eyebrow: st
     </header>
   );
 }
+
+/** "3 分钟前" / "3 minutes ago"; re-renders every 30 s so the text stays fresh. */
+export function RelativeTime({ value }: { value?: string | null }) {
+  const { t, i18n } = useTranslation();
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const timer = window.setInterval(() => setTick((tick) => tick + 1), 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
+  if (!value) return <span className="admin-muted">{t("admin.never")}</span>;
+  const seconds = Math.round((new Date(value).getTime() - Date.now()) / 1000);
+  const format = new Intl.RelativeTimeFormat(i18n.language, { numeric: "auto" });
+  const abs = Math.abs(seconds);
+  const text = abs < 45 ? format.format(0, "second") : abs < 3600 ? format.format(Math.round(seconds / 60), "minute") : abs < 86400 ? format.format(Math.round(seconds / 3600), "hour") : format.format(Math.round(seconds / 86400), "day");
+  return <time dateTime={value} title={value.replace("T", " ").slice(0, 19)}>{text}</time>;
+}

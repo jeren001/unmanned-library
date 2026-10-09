@@ -47,3 +47,26 @@ The frontend already reads `call_number` when present (`web/src/kiosk/kioskState
 - **Endpoint:** `GET /api/readers`, `GET /api/readers/:id`.
 - **Reason:** rows are raw `users` rows, so they include `password_hash` (and `qr_code`), and the list also returns librarian/admin accounts. The admin UI never displays them and filters to `role = "reader"`, but they should not leave the server.
 - **Shape:** omit `password_hash`/`qr_code`, and filter the list to `role = 'reader'` on the server.
+
+## 6. Device test command — open (mocked)
+
+- **Endpoint:** `POST /api/devices/:id/test` (librarian/admin), body `{ "command": "ping" | "self_test" | "print_test" | "open_gate" | "snapshot" | "toggle" }`.
+- **Reason:** the device drawer has a test console. Until the route exists, `testDevice` in `web/src/admin/adminApi.ts` answers with a mock based on the device status (online → OK with latency, offline → timeout, fault → error) and labels results "simulated".
+- **Shape:** `{ "data": { "command": "ping", "ok": true, "latencyMs": 42, "output": "ping: OK", "at": "2026-10-09T10:00:00Z" } }`. Should go through the integration adapters and be audited.
+
+## 7. Camera clip lookup — open (mocked)
+
+- **Endpoint:** `GET /api/clips/:id` (librarian/admin) for `alerts.related_clip_id`.
+- **Reason:** the alert drawer has a clip player. `camera_clips` exists in the schema but nothing serves it, and `file_path` is not a URL. Until then the player shows a clearly labelled simulated feed for the clip window (alert time −10 s … +20 s).
+- **Shape:** `{ "data": { "id", "device_id", "branch_id", "start_ts", "end_ts", "url": "/api/clips/clip-1/video" } }` plus a streamable video at `url` (or `url: null` if the file is missing).
+
+## 8. Alert acknowledgement time and resolve event — open
+
+- **Endpoints:** `alerts` rows and the SSE stream.
+- **Reason:** the alert timeline needs when an alert was acknowledged. Rows have `acked_by` but no time, so the UI uses `updated_at` and marks it "approximate". Also `POST /api/alerts/:id/resolve` publishes no event, so other open consoles only see resolutions on their next refresh.
+- **Shape:** add `acked_at` to alerts (set in `ack`), and publish `alert.resolved` with the same `AlertEvent` payload.
+
+## 9. Single device lookup — open
+
+- **Endpoint:** `GET /api/devices/:id`.
+- **Reason:** alerts and maintenance rows reference `device_id`; the frontend currently loads all devices (`limit=200`) to resolve names.

@@ -6,9 +6,14 @@ import { BellIcon } from "../shared/icons";
 import { BookSpinesBand } from "../shared/motion";
 import { ApiError, fetchBranches, fetchMe, fetchOpenAlerts, logout, type AlertRow, type Branch, type Role, type SessionUser } from "./adminApi";
 import { ErrorPanel, formatDate } from "./adminUi";
+import { AdminContext, AdminEventHub, type AdminContextValue } from "./adminContext";
 import { CommandPalette, type Command } from "./CommandPalette";
 import { BooksPage, CirculationPage, ReadersPage } from "./ListPages";
+import { AlertsPage } from "./AlertsPage";
+import { DevicesPage } from "./DevicesPage";
+import { MaintenancePage } from "./MaintenancePage";
 import { OverviewPage, RulesPage } from "./OverviewRules";
+import { SimulatorPage } from "./SimulatorPage";
 import "./admin.css";
 
 type Theme = "light" | "dark";
@@ -19,7 +24,11 @@ const NAV: NavItem[] = [
   { key: "books", path: "books", roles: ["librarian", "admin"], plate: "100" },
   { key: "readers", path: "readers", roles: ["librarian", "admin"], plate: "200" },
   { key: "circulation", path: "circulation", roles: ["librarian", "admin"], plate: "300" },
-  { key: "rules", path: "settings/rules", roles: ["admin"], plate: "900" }
+  { key: "devices", path: "devices", roles: ["librarian", "admin"], plate: "400" },
+  { key: "alerts", path: "alerts", roles: ["librarian", "admin"], plate: "500" },
+  { key: "maintenance", path: "maintenance", roles: ["librarian", "admin"], plate: "600" },
+  { key: "rules", path: "settings/rules", roles: ["admin"], plate: "900" },
+  { key: "simulator", path: "settings/simulator", roles: ["admin"], plate: "950" }
 ];
 
 const THEME_KEY = "ul-admin-theme";
@@ -100,6 +109,7 @@ function AdminShell({ user }: { user: SessionUser }) {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const bellRef = useRef<HTMLDivElement>(null);
+  const hub = useMemo(() => new AdminEventHub(), []);
 
   const nav = NAV.filter((item) => item.roles.includes(user.role));
 
@@ -139,12 +149,22 @@ function AdminShell({ user }: { user: SessionUser }) {
       toast({ tone: "alert", title: t("admin.alerts.new", { severity: t(`admin.severity.${payload.severity ?? "warning"}`) }), body: payload.message });
     };
     const onChanged = () => { refreshAlerts(); setRefreshKey((value) => value + 1); };
+    const forward = (name: "alert.raised" | "alert.acked" | "alert.resolved" | "device.status_changed" | "kpi.updated") => (event: Event) => {
+      let payload: unknown = null;
+      try {
+        payload = JSON.parse((event as MessageEvent<string>).data);
+      } catch {
+        // Pages treat a missing payload as "something changed".
+      }
+      hub.emit(name, payload);
+    };
     stream.addEventListener("alert.raised", onRaised as EventListener);
     stream.addEventListener("alert.acked", onChanged);
     stream.addEventListener("alert.resolved", onChanged);
     stream.addEventListener("kpi.updated", onChanged);
+    for (const name of ["alert.raised", "alert.acked", "alert.resolved", "device.status_changed", "kpi.updated"] as const) stream.addEventListener(name, forward(name));
     return () => stream.close();
-  }, [branchId, refreshAlerts, toast, t]);
+  }, [branchId, refreshAlerts, toast, t, hub]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -170,6 +190,17 @@ function AdminShell({ user }: { user: SessionUser }) {
     navigate("/login", { replace: true });
   }
 
+  const context = useMemo<AdminContextValue>(() => ({
+    user,
+    branches,
+    branchId,
+    branchName: (id: string) => {
+      const branch = branches.find((item) => item.id === id);
+      return branch ? (i18n.language === "en" ? branch.name_en : branch.name_zh) : id;
+    },
+    events: hub
+  }), [user, branches, branchId, i18n.language, hub]);
+
   const current = nav.find((item) => item.path && location.pathname.startsWith(`/admin/${item.path}`)) ?? nav[0];
   const branchName = (branch: Branch) => (i18n.language === "en" ? branch.name_en : branch.name_zh);
 
@@ -182,6 +213,7 @@ function AdminShell({ user }: { user: SessionUser }) {
   ], [nav.length, theme, i18n.language, t]);
 
   return (
+    <AdminContext.Provider value={context}>
     <div className="admin-app" data-theme={theme}>
       <aside className="admin-sidebar" aria-label={t("admin.navigation")}>
         <div className="admin-brand">
@@ -246,6 +278,7 @@ function AdminShell({ user }: { user: SessionUser }) {
                     ))}
                   </ul>
                 ) : <p>{t("admin.overview.noAlerts")}</p>}
+                <NavLink className="admin-bell-all" to="/admin/alerts" onClick={() => setBellOpen(false)}>{t("admin.alerts.viewAll")} →</NavLink>
               </div>
             ) : null}
           </div>
@@ -269,6 +302,10 @@ function AdminShell({ user }: { user: SessionUser }) {
             <Route path="circulation" element={<CirculationPage branchId={branchId} />} />
             <Route path="settings" element={<Navigate to="/admin/settings/rules" replace />} />
             <Route path="settings/rules" element={<RequireRole user={user} roles={["admin"]}><RulesPage /></RequireRole>} />
+            <Route path="devices" element={<DevicesPage />} />
+            <Route path="alerts" element={<AlertsPage />} />
+            <Route path="maintenance" element={<MaintenancePage />} />
+            <Route path="settings/simulator" element={<RequireRole user={user} roles={["admin"]}><SimulatorPage /></RequireRole>} />
             <Route path="*" element={<Navigate to="/admin" replace />} />
           </Routes>
         </main>
@@ -281,5 +318,6 @@ function AdminShell({ user }: { user: SessionUser }) {
         searchCommand={(text) => ({ id: "search-books", group: t("admin.palette.search"), label: t("admin.palette.searchBooks", { text }), run: () => navigate(`/admin/books?q=${encodeURIComponent(text)}`) })}
       />
     </div>
+    </AdminContext.Provider>
   );
 }
