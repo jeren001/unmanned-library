@@ -1,45 +1,69 @@
-import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes } from "react";
-import { useMemo, useState } from "react";
+import type { ButtonHTMLAttributes, InputHTMLAttributes, KeyboardEvent, ReactNode, SelectHTMLAttributes } from "react";
+import { createContext, useCallback, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { AlertIcon, CheckIcon, ChevronIcon, CloseIcon, InfoIcon, OfflineIcon, SpinnerIcon } from "./icons";
+import { AlertIcon, BellIcon, CheckIcon, ChevronIcon, CloseIcon, InfoIcon, OfflineIcon, SpinnerIcon } from "./icons";
+import { animate, BookSpinesBand, easing, prefersReducedMotion, useStagger } from "./motion";
 
 type Tone = "ok" | "warn" | "danger" | "info" | "offline";
+export type BookStatus = "in" | "borrowed" | "overdue" | "repair";
+
+function cx(...names: Array<string | false | null | undefined>) {
+  return names.filter(Boolean).join(" ");
+}
 
 export function Logo() {
+  const { t } = useTranslation();
   return (
-    <div className="qa-logo" aria-label="Unmanned Library">
-      <span>UL</span>
+    <div className="qa-logo" aria-label={t("app.name")}>
+      <span>{t("app.logo")}</span>
     </div>
   );
 }
 
 export function Button({
   variant = "primary",
+  size = "md",
   loading = false,
+  className,
   children,
+  disabled,
   ...props
-}: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "secondary" | "ghost" | "danger"; loading?: boolean }) {
+}: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "secondary" | "ghost" | "danger"; size?: "md" | "lg"; loading?: boolean }) {
   return (
-    <button className={`qa-button qa-button-${variant}`} disabled={props.disabled || loading} {...props}>
+    <button
+      className={cx("qa-button", `qa-button-${variant}`, size === "lg" && "qa-button-lg", loading && "is-loading", className)}
+      disabled={disabled || loading}
+      aria-busy={loading || undefined}
+      {...props}
+    >
       {loading ? <SpinnerIcon className="qa-spin" /> : null}
       <span>{children}</span>
     </button>
   );
 }
 
-export function TextField({ label, error, ...props }: InputHTMLAttributes<HTMLInputElement> & { label: string; error?: string }) {
-  const id = props.id ?? props.name ?? label;
+export function TextField({
+  label,
+  hint,
+  error,
+  mono = false,
+  ...props
+}: InputHTMLAttributes<HTMLInputElement> & { label: string; hint?: string; error?: string; mono?: boolean }) {
+  const autoId = useId();
+  const id = props.id ?? props.name ?? autoId;
+  const describedBy = error ? `${id}-error` : hint ? `${id}-hint` : undefined;
   return (
-    <label className="qa-field" htmlFor={id}>
+    <label className={cx("qa-field", mono && "is-mono")} htmlFor={id}>
       <span>{label}</span>
-      <input id={id} aria-invalid={Boolean(error)} aria-describedby={error ? `${id}-error` : undefined} {...props} />
-      {error ? <strong id={`${id}-error`} role="alert">{error}</strong> : null}
+      <input id={id} aria-invalid={Boolean(error)} aria-describedby={describedBy} {...props} />
+      {error ? <strong id={`${id}-error`} role="alert">{error}</strong> : hint ? <small id={`${id}-hint`}>{hint}</small> : null}
     </label>
   );
 }
 
 export function Select({ label, children, ...props }: SelectHTMLAttributes<HTMLSelectElement> & { label: string; children: ReactNode }) {
-  const id = props.id ?? props.name ?? label;
+  const autoId = useId();
+  const id = props.id ?? props.name ?? autoId;
   return (
     <label className="qa-field qa-select" htmlFor={id}>
       <span>{label}</span>
@@ -49,11 +73,51 @@ export function Select({ label, children, ...props }: SelectHTMLAttributes<HTMLS
   );
 }
 
-export function Tabs({ items, value, onChange }: { items: string[]; value: string; onChange: (value: string) => void }) {
+type TabItem = string | { value: string; label: ReactNode };
+
+/** Folder tabs: the selected tab joins the paper panel below it. */
+export function Tabs({ items, value, onChange, label }: { items: TabItem[]; value: string; onChange: (value: string) => void; label?: string }) {
+  const { t } = useTranslation();
+  const listRef = useRef<HTMLDivElement>(null);
+  const options = items.map((item) => (typeof item === "string" ? { value: item, label: item } : item));
+
+  const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    const keys: Record<string, number> = { ArrowRight: 1, ArrowLeft: -1 };
+    const index = options.findIndex((option) => option.value === value);
+    let next = -1;
+    if (event.key in keys) next = (index + keys[event.key] + options.length) % options.length;
+    if (event.key === "Home") next = 0;
+    if (event.key === "End") next = options.length - 1;
+    if (next < 0) return;
+    event.preventDefault();
+    onChange(options[next].value);
+    listRef.current?.querySelectorAll<HTMLButtonElement>("[role=tab]")[next]?.focus();
+  };
+
   return (
-    <div className="qa-tabs" role="tablist" aria-label="Tabs">
+    <div ref={listRef} className="qa-tabs" role="tablist" aria-label={label ?? t("tabs.label")} onKeyDown={onKeyDown}>
+      {options.map((option) => (
+        <button
+          key={option.value}
+          type="button"
+          role="tab"
+          aria-selected={value === option.value}
+          tabIndex={value === option.value ? 0 : -1}
+          onClick={() => onChange(option.value)}
+        >
+          {option.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+export function SegmentedControl({ items, value, onChange, label }: { items: string[]; value: string; onChange: (value: string) => void; label?: string }) {
+  const { t } = useTranslation();
+  return (
+    <div className="qa-segmented" role="group" aria-label={label ?? t("segmented.label")}>
       {items.map((item) => (
-        <button key={item} role="tab" aria-selected={value === item} onClick={() => onChange(item)}>
+        <button key={item} type="button" aria-pressed={value === item} onClick={() => onChange(item)}>
           {item}
         </button>
       ))}
@@ -61,153 +125,309 @@ export function Tabs({ items, value, onChange }: { items: string[]; value: strin
   );
 }
 
-export function SegmentedControl({ items, value, onChange }: { items: string[]; value: string; onChange: (value: string) => void }) {
+export function Card({ title, children, className }: { title: ReactNode; children: ReactNode; className?: string }) {
   return (
-    <div className="qa-segmented" role="group" aria-label="Segmented control">
-      {items.map((item) => (
-        <button key={item} aria-pressed={value === item} onClick={() => onChange(item)}>
-          {item}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-export function Card({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <section className="qa-card">
+    <section className={cx("qa-card", className)}>
       <h2>{title}</h2>
       {children}
     </section>
   );
 }
 
-export function CatalogCard({ callNumber, title, meta }: { callNumber: string; title: string; meta: string }) {
-  return (
-    <article className="qa-catalog-card">
-      <div>
-        <code>{callNumber}</code>
-        <StatusBadge tone="ok" label="在架" />
-      </div>
-      <h3>{title}</h3>
-      <p>{meta}</p>
-    </article>
-  );
-}
+const TONE_ICONS = { ok: CheckIcon, warn: AlertIcon, danger: AlertIcon, info: InfoIcon, offline: OfflineIcon } as const;
 
-export function StatusBadge({ tone, label }: { tone: Tone; label: string }) {
-  const Icon = tone === "ok" ? CheckIcon : tone === "info" ? InfoIcon : tone === "offline" ? OfflineIcon : AlertIcon;
+/**
+ * Book status (`status`: in stock / borrowed / overdue / repair) or a generic system tone (`tone`).
+ * Overdue gently pulses.
+ */
+export function StatusBadge(props: { status: BookStatus; label?: string } | { tone: Tone; label: string }) {
+  const { t } = useTranslation();
+  if ("status" in props) {
+    return (
+      <span className={cx("qa-badge", `qa-badge-${props.status}`)}>
+        <i aria-hidden="true" />
+        {props.label ?? t(`book.status.${props.status}`)}
+      </span>
+    );
+  }
+  const Icon = TONE_ICONS[props.tone];
   return (
-    <span className={`qa-status qa-status-${tone}`}>
+    <span className={cx("qa-badge", `qa-badge-tone-${props.tone}`)}>
       <Icon />
-      {label}
+      {props.label}
     </span>
   );
 }
 
-export function DataTable({ state = "ready" }: { state?: "ready" | "empty" | "loading" | "error" }) {
+/** Library catalogue card: burgundy spine strip, serif title, call number in mono. */
+export function CatalogCard({
+  callNumber,
+  title,
+  author,
+  location,
+  status,
+  meta,
+  children
+}: {
+  callNumber: string;
+  title: string;
+  author?: string;
+  location?: string;
+  status?: BookStatus;
+  meta?: string;
+  children?: ReactNode;
+}) {
   const { t } = useTranslation();
-  const rows = [
-    ["木心谈木心", "I247.5 / M87", "R-2048", t("status.ok")],
-    ["Architecture Patterns", "QA76.76 / A73", "R-1842", t("status.warn")],
-    ["未来图书馆", "G250 / L52", "R-0871", t("status.info")]
-  ];
+  return (
+    <article className="qa-catalog-card">
+      <i aria-hidden="true" />
+      <div>
+        <header>
+          <code>{callNumber}</code>
+          {status ? <StatusBadge status={status} /> : null}
+        </header>
+        <h3>{title}</h3>
+        {meta ? <p>{meta}</p> : null}
+        {author || location ? (
+          <dl>
+            {author ? <><dt>{t("catalog.author")}</dt><dd>{author}</dd></> : null}
+            <dt>{t("catalog.callNumber")}</dt><dd className="mono">{callNumber}</dd>
+            {location ? <><dt>{t("catalog.location")}</dt><dd>{location}</dd></> : null}
+          </dl>
+        ) : null}
+        {children}
+      </div>
+    </article>
+  );
+}
+
+export type Column<Row> = {
+  key: string;
+  header: ReactNode;
+  render?: (row: Row) => ReactNode;
+  mono?: boolean;
+};
+
+export function DataTable<Row extends Record<string, unknown>>({
+  columns,
+  rows,
+  rowKey,
+  state = "ready",
+  caption,
+  emptyText,
+  errorText,
+  selectedKey,
+  onRowClick
+}: {
+  columns: Column<Row>[];
+  rows: Row[];
+  rowKey: (row: Row) => string;
+  state?: "ready" | "loading" | "error";
+  caption?: string;
+  emptyText?: string;
+  errorText?: string;
+  selectedKey?: string | null;
+  onRowClick?: (row: Row) => void;
+}) {
+  const { t } = useTranslation();
+  const bodyRef = useRef<HTMLTableSectionElement>(null);
+  useStagger(bodyRef, [rows, state], { step: 60, distance: 12, duration: 450 });
+
+  const message = state === "error" ? errorText ?? t("table.error") : !rows.length && state === "ready" ? emptyText ?? t("table.empty") : null;
 
   return (
     <div className="qa-table-wrap">
       <table className="qa-table">
+        {caption ? <caption className="qa-sr-only">{caption}</caption> : null}
         <thead>
-          <tr>
-            {[t("table.book"), t("table.call"), t("table.reader"), t("table.status")].map((header) => (
-              <th key={header}><button>{header}<ChevronIcon /></button></th>
-            ))}
-          </tr>
+          <tr>{columns.map((column) => <th key={column.key} scope="col">{column.header}</th>)}</tr>
         </thead>
-        <tbody>
-          {state === "ready" ? rows.map((row) => (
-            <tr key={row[1]}>
-              <td>{row[0]}</td>
-              <td><code>{row[1]}</code></td>
-              <td>{row[2]}</td>
-              <td><StatusBadge tone={row[3] === t("status.warn") ? "warn" : row[3] === t("status.info") ? "info" : "ok"} label={row[3]} /></td>
-            </tr>
-          )) : (
-            <tr>
-              <td colSpan={4}>
-                {state === "loading" ? <Skeleton lines={3} /> : (
-                  <div className={`qa-table-state qa-table-state-${state}`}>
-                    {state === "empty" ? t("table.empty") : t("table.error")}
-                  </div>
-                )}
-              </td>
-            </tr>
-          )}
+        <tbody ref={bodyRef} aria-busy={state === "loading" || undefined}>
+          {state === "loading" ? (
+            <tr><td colSpan={columns.length}><Skeleton lines={3} /></td></tr>
+          ) : message ? (
+            <tr><td colSpan={columns.length}><div className={cx("qa-table-state", state === "error" && "is-error")}>{message}</div></td></tr>
+          ) : rows.map((row) => {
+            const key = rowKey(row);
+            return (
+              <tr
+                key={key}
+                className={cx(onRowClick && "is-clickable", selectedKey === key && "is-selected")}
+                tabIndex={onRowClick ? 0 : undefined}
+                onClick={onRowClick ? () => onRowClick(row) : undefined}
+                onKeyDown={onRowClick ? (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onRowClick(row); } } : undefined}
+              >
+                {columns.map((column) => (
+                  <td key={column.key} className={column.mono ? "mono" : undefined}>
+                    {column.render ? column.render(row) : String(row[column.key] ?? "")}
+                  </td>
+                ))}
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
   );
 }
 
-export function StatCard({ title, value, delta }: { title: string; value: string; delta: string }) {
+export function StatCard({ title, value, delta }: { title: string; value: ReactNode; delta?: string }) {
   return (
     <article className="qa-stat-card">
       <span>{title}</span>
       <strong>{value}</strong>
-      <div>
-        <small>{delta}</small>
-        <svg viewBox="0 0 96 28" aria-label="sparkline">
-          <path d="M2 21 C14 14 20 18 30 10 S48 14 58 8 74 12 94 4" />
-        </svg>
-      </div>
+      {delta ? <small>{delta}</small> : null}
     </article>
   );
 }
 
-export function Toast() {
+/** Side drawer with a wooden edge. `contained` positions it inside the nearest positioned parent. */
+export function Drawer({
+  open,
+  onClose,
+  title,
+  children,
+  contained = false
+}: {
+  open: boolean;
+  onClose: () => void;
+  title: ReactNode;
+  children: ReactNode;
+  contained?: boolean;
+}) {
   const { t } = useTranslation();
-  return (
-    <div className="qa-toast" role="status">
-      <CheckIcon />
-      <div>
-        <strong>{t("toast.title")}</strong>
-        <p>{t("toast.body")}</p>
-      </div>
-    </div>
-  );
-}
+  const titleId = useId();
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
-export function Dialog() {
-  const { t } = useTranslation();
-  return (
-    <div className="qa-dialog" role="dialog" aria-modal="false" aria-labelledby="dialog-title">
-      <button aria-label="Close dialog"><CloseIcon /></button>
-      <h3 id="dialog-title">{t("dialog.title")}</h3>
-      <p>{t("dialog.body")}</p>
-      <div><Button variant="secondary">{t("action.ghost")}</Button><Button variant="danger">{t("action.danger")}</Button></div>
-    </div>
-  );
-}
+  useEffect(() => {
+    if (!open) return;
+    closeRef.current?.focus();
+    const onKey = (event: globalThis.KeyboardEvent) => { if (event.key === "Escape") onCloseRef.current(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
 
-export function Drawer() {
-  const { t } = useTranslation();
   return (
-    <aside className="qa-drawer" aria-label={t("drawer.title")}>
-      <h3>{t("drawer.title")}</h3>
-      <dl>
-        <dt>ID</dt><dd>RFID-GATE-02</dd>
-        <dt>IP</dt><dd>10.0.4.18</dd>
-        <dt>FW</dt><dd>2.8.1</dd>
-      </dl>
+    <aside
+      className={cx("qa-drawer", contained && "is-contained")}
+      data-open={open}
+      role="dialog"
+      aria-modal="false"
+      aria-labelledby={titleId}
+      aria-hidden={!open}
+      inert={!open}
+    >
+      <button ref={closeRef} type="button" className="qa-drawer-close" onClick={onClose} aria-label={t("action.close")}><CloseIcon /></button>
+      <h3 id={titleId}>{title}</h3>
+      {children}
     </aside>
   );
+}
+
+export function Dialog({ title, body, actions }: { title: string; body: string; actions?: ReactNode }) {
+  const titleId = useId();
+  return (
+    <div className="qa-dialog" role="dialog" aria-modal="false" aria-labelledby={titleId}>
+      <h3 id={titleId}>{title}</h3>
+      <p>{body}</p>
+      {actions ? <div>{actions}</div> : null}
+    </div>
+  );
+}
+
+type ToastTone = "info" | "success" | "alert";
+type ToastInput = { title: string; body?: string; tone?: ToastTone; duration?: number };
+type ToastItem = ToastInput & { id: number; leaving: boolean };
+
+const TOAST_ICONS = { info: InfoIcon, success: CheckIcon, alert: BellIcon } as const;
+
+/** A single toast; slides in from above on mount and out again when `leaving` becomes true. */
+export function Toast({ title, body, tone = "info", leaving = false, onClose, onExited }: ToastInput & { leaving?: boolean; onClose?: () => void; onExited?: () => void }) {
+  const { t } = useTranslation();
+  const ref = useRef<HTMLDivElement>(null);
+  const Icon = TOAST_ICONS[tone];
+  const onExitedRef = useRef(onExited);
+  onExitedRef.current = onExited;
+
+  useLayoutEffect(() => {
+    const animation = animate(ref.current, [{ opacity: 0, transform: "translateY(-90px)" }, { opacity: 1, transform: "none" }], { duration: 450, easing: easing.spring, fill: "backwards" });
+    return () => animation?.cancel();
+  }, []);
+
+  useEffect(() => {
+    if (!leaving) return;
+    const animation = animate(ref.current, [{ opacity: 1, transform: "none" }, { opacity: 0, transform: "translateY(-24px) scale(.96)" }], { duration: 260, easing: easing.out, fill: "forwards" });
+    if (!animation) {
+      onExitedRef.current?.();
+      return;
+    }
+    animation.onfinish = () => onExitedRef.current?.();
+    return () => animation.cancel();
+  }, [leaving]);
+
+  return (
+    <div ref={ref} className={cx("qa-toast", `qa-toast-${tone}`)} role={tone === "alert" ? "alert" : "status"}>
+      <Icon />
+      <div>
+        <strong>{title}</strong>
+        {body ? <p>{body}</p> : null}
+      </div>
+      {onClose ? <button type="button" onClick={onClose} aria-label={t("action.close")}><CloseIcon /></button> : null}
+    </div>
+  );
+}
+
+const ToastContext = createContext<(toast: ToastInput) => void>(() => undefined);
+
+export function ToastProvider({ children }: { children: ReactNode }) {
+  const [items, setItems] = useState<ToastItem[]>([]);
+  const nextId = useRef(1);
+  const timers = useRef(new Map<number, number>());
+
+  const dismiss = useCallback((id: number) => {
+    window.clearTimeout(timers.current.get(id));
+    timers.current.delete(id);
+    if (prefersReducedMotion()) setItems((list) => list.filter((item) => item.id !== id));
+    else setItems((list) => list.map((item) => (item.id === id ? { ...item, leaving: true } : item)));
+  }, []);
+
+  const remove = useCallback((id: number) => setItems((list) => list.filter((item) => item.id !== id)), []);
+
+  const push = useCallback((toast: ToastInput) => {
+    const id = nextId.current++;
+    setItems((list) => [...list.slice(-3), { ...toast, id, leaving: false }]);
+    timers.current.set(id, window.setTimeout(() => dismiss(id), toast.duration ?? 3600));
+  }, [dismiss]);
+
+  useEffect(() => {
+    const pending = timers.current;
+    return () => pending.forEach((timer) => window.clearTimeout(timer));
+  }, []);
+
+  return (
+    <ToastContext.Provider value={push}>
+      {children}
+      <div className="qa-toast-viewport" aria-live="polite">
+        {items.map((item) => (
+          <Toast key={item.id} {...item} onClose={() => dismiss(item.id)} onExited={() => remove(item.id)} />
+        ))}
+      </div>
+    </ToastContext.Provider>
+  );
+}
+
+export function useToast() {
+  return useContext(ToastContext);
 }
 
 export function Stepper({ steps, current }: { steps: string[]; current: number }) {
   return (
     <ol className="qa-stepper">
       {steps.map((step, index) => (
-        <li key={step} aria-current={index === current ? "step" : undefined} data-complete={index < current}>
-          <span>{index + 1}</span>
+        <li key={step} aria-current={index === current ? "step" : undefined} data-state={index < current ? "done" : index === current ? "current" : "todo"}>
+          <span aria-hidden="true">{index < current ? "✓" : index + 1}</span>
           {step}
         </li>
       ))}
@@ -215,20 +435,21 @@ export function Stepper({ steps, current }: { steps: string[]; current: number }
   );
 }
 
-export function EmptyState() {
-  const { t } = useTranslation();
+export function EmptyState({ title, body, action }: { title: string; body?: string; action?: ReactNode }) {
   return (
     <div className="qa-empty">
-      <BookSpines seed={8} />
-      <h3>{t("empty.title")}</h3>
-      <p>{t("empty.body")}</p>
+      <BookSpinesBand count={12} height={34} className="is-small" />
+      <h3>{title}</h3>
+      {body ? <p>{body}</p> : null}
+      {action}
     </div>
   );
 }
 
 export function Skeleton({ lines = 2 }: { lines?: number }) {
+  const { t } = useTranslation();
   return (
-    <div className="qa-skeleton" aria-label="Loading">
+    <div className="qa-skeleton" role="status" aria-label={t("state.loading")}>
       {Array.from({ length: lines }, (_, index) => <span key={index} />)}
     </div>
   );
@@ -238,6 +459,7 @@ export function LangSwitch() {
   const { i18n, t } = useTranslation();
   return (
     <SegmentedControl
+      label={t("lang.label")}
       items={[t("lang.zh"), t("lang.en")]}
       value={i18n.language === "zh-CN" ? t("lang.zh") : t("lang.en")}
       onChange={(label) => void i18n.changeLanguage(label === t("lang.zh") ? "zh-CN" : "en")}
@@ -250,6 +472,7 @@ export function ThemeSwitch({ mode, onModeChange }: { mode: "light" | "dark" | "
   const labels = [t("theme.light"), t("theme.dark"), t("theme.kiosk")];
   return (
     <SegmentedControl
+      label={t("theme.label")}
       items={labels}
       value={mode === "light" ? labels[0] : mode === "dark" ? labels[1] : labels[2]}
       onChange={(label) => onModeChange(label === labels[1] ? "dark" : label === labels[2] ? "kiosk" : "light")}
@@ -257,7 +480,9 @@ export function ThemeSwitch({ mode, onModeChange }: { mode: "light" | "dark" | "
   );
 }
 
+/** Static SVG shelf used by the kiosk idle and empty screens. */
 export function BookSpines({ seed = 4 }: { seed?: number }) {
+  const { t } = useTranslation();
   const bars = useMemo(() => {
     let value = seed * 9301 + 49297;
     return Array.from({ length: 14 }, (_, index) => {
@@ -267,105 +492,11 @@ export function BookSpines({ seed = 4 }: { seed?: number }) {
   }, [seed]);
 
   return (
-    <svg className="qa-spines" viewBox="0 0 120 78" role="img" aria-label="Book spine motif">
+    <svg className="qa-spines" viewBox="0 0 120 78" role="img" aria-label={t("motif.spines")}>
       <line x1="8" y1="70" x2="112" y2="70" />
       {bars.map((bar, index) => (
         <rect key={index} x={12 + index * 7} y={70 - bar.height - bar.y} width={bar.width} height={bar.height} rx="1" />
       ))}
     </svg>
-  );
-}
-
-export function ShowcasePage() {
-  const { t } = useTranslation();
-  const [mode, setMode] = useState<"light" | "dark" | "kiosk">(() => {
-    const params = new URLSearchParams(window.location.search);
-    return params.get("mode") === "dark" ? "dark" : params.get("mode") === "kiosk" ? "kiosk" : "light";
-  });
-  const [tab, setTab] = useState(t("tabs.overview"));
-  const [segment, setSegment] = useState(t("seg.today"));
-  const theme = mode === "dark" ? "dark" : "light";
-
-  return (
-    <main className={`qa-showcase ${mode === "kiosk" ? "qa-kiosk" : ""}`} data-theme={theme}>
-      <header className="qa-showcase-header">
-        <div>
-          <Logo />
-          <div>
-            <p>{t("app.name")}</p>
-            <h1>{t("design.title")}</h1>
-            <span>{t("design.subtitle")}</span>
-          </div>
-        </div>
-        <div aria-label={t("design.controls")}>
-          <LangSwitch />
-          <ThemeSwitch mode={mode} onModeChange={setMode} />
-        </div>
-      </header>
-
-      <section className="qa-grid">
-        <Card title={t("design.buttons")}>
-          <div className="qa-row">
-            <Button>{t("action.confirm")}</Button>
-            <Button variant="secondary">{t("action.secondary")}</Button>
-            <Button variant="ghost">{t("action.ghost")}</Button>
-            <Button variant="danger">{t("action.danger")}</Button>
-            <Button loading>{t("action.loading")}</Button>
-            <Button disabled>{t("action.disabled")}</Button>
-          </div>
-        </Card>
-
-        <Card title={t("design.forms")}>
-          <div className="qa-form-grid">
-            <TextField label={t("field.reader")} placeholder={t("field.reader.placeholder")} />
-            <TextField label={t("field.reader")} value="R-2048" error="证件状态需复核" readOnly />
-            <Select label={t("field.branch")} defaultValue="north"><option value="north">北馆</option><option value="south">南馆</option></Select>
-          </div>
-        </Card>
-
-        <Card title={t("design.navigation")}>
-          <Tabs items={[t("tabs.overview"), t("tabs.devices"), t("tabs.loans")]} value={tab} onChange={setTab} />
-          <SegmentedControl items={[t("seg.today"), t("seg.week"), t("seg.month")]} value={segment} onChange={setSegment} />
-          <Stepper steps={[t("step.one"), t("step.two"), t("step.three")]} current={1} />
-        </Card>
-
-        <Card title={t("design.surfaces")}>
-          <div className="qa-status-row">
-            <StatusBadge tone="ok" label={t("status.ok")} />
-            <StatusBadge tone="warn" label={t("status.warn")} />
-            <StatusBadge tone="danger" label={t("status.danger")} />
-            <StatusBadge tone="info" label={t("status.info")} />
-            <StatusBadge tone="offline" label={t("status.offline")} />
-          </div>
-          <CatalogCard callNumber="I247.5 / M87" title="木心谈木心" meta="文学 / 二层东区 / RFID 0048" />
-        </Card>
-
-        <Card title={t("design.data")}>
-          <div className="qa-stats">
-            <StatCard title={t("stat.loans")} value="428" delta={t("stat.delta")} />
-            <StatCard title="在线设备" value="96.8%" delta="3 faults" />
-          </div>
-          <DataTable />
-          <div className="qa-state-grid">
-            <DataTable state="empty" />
-            <DataTable state="loading" />
-            <DataTable state="error" />
-          </div>
-        </Card>
-
-        <Card title={t("design.feedback")}>
-          <div className="qa-feedback-grid">
-            <Toast />
-            <Dialog />
-            <Drawer />
-          </div>
-        </Card>
-
-        <Card title={t("design.workflow")}>
-          <EmptyState />
-          <Skeleton lines={4} />
-        </Card>
-      </section>
-    </main>
   );
 }

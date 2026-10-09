@@ -1,14 +1,14 @@
 .kiosk-page {
-  --kiosk-forest: #163c2d;
-  --kiosk-forest-deep: #10281e;
-  --kiosk-brass: #b47a20;
+  --kiosk-forest: var(--accent);
+  --kiosk-forest-deep: var(--burgundy-deep);
+  --kiosk-brass: var(--wood);
   min-height: 100vh;
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: var(--paper);
-  color: var(--ink);
+  background: var(--bg);
+  color: var(--text);
   font-size: 20px;
 }
 
@@ -43,7 +43,7 @@
 .kiosk-back {
   border: 0;
   cursor: pointer;
-  color: var(--ink);
+  color: var(--text);
   background: transparent;
 }
 
@@ -65,14 +65,14 @@
 }
 
 .kiosk-branch strong {
-  font-family: Fraunces, "Noto Serif SC", serif;
+  font-family: var(--font-serif);
   font-size: 22px;
   font-weight: 600;
 }
 
 .kiosk-branch span {
-  color: var(--ink-2);
-  font-family: "JetBrains Mono", monospace;
+  color: var(--text-2);
+  font-family: var(--font-mono);
   font-size: 12px;
 }
 
@@ -98,7 +98,7 @@
 .kiosk-exit {
   min-height: 64px;
   padding: 0 14px;
-  color: var(--ink-2);
+  color: var(--text-2);
 }
 
 .kiosk-exit span,
@@ -120,9 +120,9 @@
   justify-content: center;
   align-items: center;
   gap: 12px;
-  color: #5a3b0d;
-  border-bottom: 1px solid #d9b568;
-  background: #f3e5c5;
+  color: var(--wood-deep);
+  border-bottom: 1px solid color-mix(in srgb, var(--wood) 45%, var(--line));
+  background: var(--surface-2);
   font-size: 17px;
   font-weight: 600;
 }
@@ -135,7 +135,7 @@
 
 .kiosk-reconcile {
   justify-content: flex-start;
-  background: #f7e2dd;
+  background: var(--status-overdue-bg);
   color: var(--danger);
 }
 
@@ -158,7 +158,7 @@
   grid-template-columns: minmax(0, 1.05fr) minmax(300px, 0.95fr);
   background:
     linear-gradient(90deg, color-mix(in srgb, var(--line) 30%, transparent) 1px, transparent 1px) 0 0 / 84px 84px,
-    var(--paper);
+    var(--bg);
 }
 
 .kiosk-idle-copy {
@@ -168,26 +168,26 @@
 
 .kiosk-eyebrow {
   margin: 0 0 22px;
-  color: var(--brass);
-  font: 14px "JetBrains Mono", monospace;
+  color: var(--wood);
+  font: 14px var(--font-mono);
 }
 
 .kiosk-idle h1 {
   margin: 0;
-  font: 600 clamp(48px, 6.3vw, 92px)/1.04 Fraunces, "Noto Serif SC", serif;
+  font: 600 clamp(48px, 6.3vw, 92px)/1.04 var(--font-serif);
 }
 
 .kiosk-idle h1 small {
   display: block;
   margin-top: 12px;
-  color: var(--ink-2);
-  font: 500 24px/1.3 Inter, "Noto Sans SC", sans-serif;
+  color: var(--text-2);
+  font: 500 24px/1.3 var(--font-sans);
 }
 
 .kiosk-clock {
   margin-top: 32px;
   color: var(--accent);
-  font: 500 clamp(64px, 8vw, 112px)/1 "JetBrains Mono", monospace;
+  font: 500 clamp(64px, 8vw, 112px)/1 var(--font-mono);
   font-variant-numeric: tabular-nums;
 }
 
@@ -199,11 +199,11 @@
 
 .kiosk-presence strong {
   color: var(--accent);
-  font: 600 1.28em "JetBrains Mono", monospace;
+  font: 600 1.28em var(--font-mono);
 }
 
 .kiosk-presence small {
-  color: var(--ink-2);
+  color: var(--text-2);
 }
 
 .kiosk-start {
@@ -217,7 +217,7 @@
   border: 1px solid var(--kiosk-forest);
   border-radius: 6px;
   background: var(--kiosk-forest);
-  color: #fffdf8;
+  color: var(--accent-ink);
   text-align: left;
   cursor: pointer;
 }
@@ -229,7 +229,7 @@
 
 .kiosk-start small {
   margin-top: 4px;
-  color: #e0e7df;
+  color: color-mix(in srgb, var(--accent-ink) 78%, transparent);
   font-size: 15px;
 }
 
@@ -246,7 +246,7 @@
   min-height: 400px;
   background:
     repeating-linear-gradient(90deg, transparent 0 27px, rgba(255,255,255,.12) 27px 29px),
-    linear-gradient(145deg, #315a45, #183b2d 62%, #10281e);
+    linear-gradient(145deg, #A3233A, var(--burgundy) 58%, var(--burgundy-deep));
 }
 
 .kiosk-idle-art::before {
@@ -256,19 +256,19 @@
   right: -12%;
   bottom: 11%;
   height: 2px;
-  background: rgba(245, 240, 226, .42);
+  background: rgba(251, 241, 225, .42);
   transform: rotate(-5deg);
 }
 
 .kiosk-idle-art .qa-spines {
   width: min(75%, 520px);
   height: min(50vh, 550px);
-  color: #ede5d2;
+  color: var(--cream);
   animation: kiosk-shelf-breathe 7s ease-in-out infinite alternate;
 }
 
 .kiosk-idle-art .qa-spines line {
-  stroke: rgba(241, 234, 217, .3);
+  stroke: rgba(251, 241, 225, .3);
 }
 
 .kiosk-idle-art .qa-spines rect {
@@ -279,8 +279,8 @@
   position: absolute;
   right: 36px;
   bottom: 28px;
-  color: #eee5d2;
-  font: 13px/1.5 "JetBrains Mono", monospace;
+  color: var(--cream);
+  font: 13px/1.5 var(--font-mono);
   text-align: right;
 }
 
@@ -313,14 +313,14 @@
 
 .kiosk-shell-heading h1 {
   margin: 0;
-  font: 600 38px/1.08 Fraunces, "Noto Serif SC", serif;
+  font: 600 38px/1.08 var(--font-serif);
 }
 
 .kiosk-shell-heading h1 small {
   display: block;
   margin-top: 5px;
-  color: var(--ink-2);
-  font: 500 16px Inter, "Noto Sans SC", sans-serif;
+  color: var(--text-2);
+  font: 500 16px var(--font-sans);
 }
 
 .kiosk-back {
@@ -357,15 +357,15 @@
 .kiosk-identify h2,
 .kiosk-tray h2 {
   margin: 0;
-  font: 600 30px/1.35 Fraunces, "Noto Serif SC", serif;
+  font: 600 30px/1.35 var(--font-serif);
 }
 
 .kiosk-identify h2 small,
 .kiosk-tray p {
   display: block;
   margin-top: 7px;
-  color: var(--ink-2);
-  font: 500 17px Inter, "Noto Sans SC", sans-serif;
+  color: var(--text-2);
+  font: 500 17px var(--font-sans);
 }
 
 .kiosk-scan-input,
@@ -379,14 +379,14 @@
   border: 1px solid var(--line);
   border-radius: 6px;
   background: var(--surface);
-  color: var(--ink);
+  color: var(--text);
   font-size: 24px;
 }
 
 .kiosk-pin-field {
   display: grid;
   gap: 8px;
-  color: var(--ink-2);
+  color: var(--text-2);
   text-align: left;
   font-size: 16px;
 }
@@ -398,7 +398,7 @@
 
 .kiosk-hint {
   margin: 0;
-  color: var(--ink-2);
+  color: var(--text-2);
   line-height: 1.55;
 }
 
@@ -414,8 +414,8 @@
   gap: 10px;
   border: 1px solid color-mix(in srgb, var(--danger) 44%, var(--line));
   border-radius: 6px;
-  color: #81271f;
-  background: #f7e8e3;
+  color: var(--danger);
+  background: var(--status-overdue-bg);
   font-size: 17px;
 }
 
@@ -442,19 +442,19 @@
 
 .kiosk-greeting h1 {
   margin: 0;
-  font: 600 46px/1.05 Fraunces, "Noto Serif SC", serif;
+  font: 600 46px/1.05 var(--font-serif);
 }
 
 .kiosk-greeting h1 small {
   display: block;
   margin-top: 8px;
-  color: var(--ink-2);
-  font: 500 17px Inter, "Noto Sans SC", sans-serif;
+  color: var(--text-2);
+  font: 500 17px var(--font-sans);
 }
 
 .kiosk-greeting p {
   margin: 0;
-  color: var(--ink-2);
+  color: var(--text-2);
   text-align: right;
   line-height: 1.5;
 }
@@ -486,16 +486,16 @@
 
 .kiosk-summary strong {
   color: var(--accent);
-  font: 600 38px "JetBrains Mono", monospace;
+  font: 600 38px var(--font-mono);
 }
 
 .kiosk-summary span {
-  color: var(--ink-2);
+  color: var(--text-2);
   font-size: 17px;
 }
 
-.kiosk-summary .is-warn strong { color: #89580d; }
-.kiosk-summary .is-danger strong { color: #8d2b23; }
+.kiosk-summary .is-warn strong { color: var(--warn); }
+.kiosk-summary .is-danger strong { color: var(--danger); }
 
 .kiosk-action-grid {
   display: grid;
@@ -513,7 +513,7 @@
   border: 1px solid var(--line);
   border-radius: 6px;
   background: var(--surface);
-  color: var(--ink);
+  color: var(--text);
   cursor: pointer;
   text-align: left;
   transition: border-color 180ms ease-out, background-color 180ms ease-out, transform 180ms ease-out;
@@ -531,14 +531,14 @@
 
 .kiosk-action-grid b {
   min-height: 42px;
-  color: var(--brass);
-  font: 500 38px/1 "JetBrains Mono", monospace;
+  color: var(--wood);
+  font: 500 38px/1 var(--font-mono);
 }
 
-.kiosk-action-grid button:first-child b { color: #e3bd72; }
+.kiosk-action-grid button:first-child b { color: var(--blush); }
 
 .kiosk-action-grid span {
-  font: 600 27px Fraunces, "Noto Serif SC", serif;
+  font: 600 27px var(--font-serif);
 }
 
 .kiosk-action-grid small {
@@ -568,7 +568,7 @@
   display: grid;
   place-items: center;
   border-bottom: 2px solid var(--line);
-  color: var(--ink-2);
+  color: var(--text-2);
   font-size: 16px;
 }
 
@@ -585,11 +585,11 @@
   justify-items: center;
   align-content: center;
   gap: 10px;
-  border: 1px dashed #9a9a7c;
+  border: 2px dashed var(--line);
   border-radius: 8px;
   background:
     repeating-linear-gradient(0deg, transparent 0 30px, color-mix(in srgb, var(--line) 26%, transparent) 30px 31px),
-    color-mix(in srgb, var(--surface) 78%, var(--paper-2));
+    color-mix(in srgb, var(--surface) 78%, var(--surface-2));
   text-align: center;
 }
 
@@ -602,15 +602,15 @@
   height: 74px;
   display: grid;
   place-items: center;
-  border: 2px solid var(--brass);
+  border: 2px solid var(--wood);
   border-radius: 50%;
-  color: var(--brass);
-  font: 15px "JetBrains Mono", monospace;
+  color: var(--wood);
+  font: 15px var(--font-mono);
   animation: kiosk-rfid-pulse 2.4s ease-out infinite;
 }
 
 @keyframes kiosk-rfid-pulse {
-  50% { box-shadow: 0 0 0 13px color-mix(in srgb, var(--brass) 13%, transparent); }
+  50% { box-shadow: 0 0 0 13px color-mix(in srgb, var(--wood) 13%, transparent); }
 }
 
 .kiosk-tray p {
@@ -676,7 +676,7 @@
 .kiosk-book-card strong,
 .kiosk-loan-main strong {
   overflow: hidden;
-  color: var(--ink);
+  color: var(--text);
   font-size: 19px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -684,13 +684,13 @@
 
 .kiosk-book-card span:not(.kiosk-spine),
 .kiosk-loan-main span {
-  color: var(--ink-2);
+  color: var(--text-2);
   font-size: 15px;
 }
 
 .kiosk-book-card code {
-  color: var(--ink-2);
-  font: 12px "JetBrains Mono", monospace;
+  color: var(--text-2);
+  font: 12px var(--font-mono);
 }
 
 .kiosk-book-card > button {
@@ -700,7 +700,7 @@
   border: 1px solid var(--line);
   border-radius: 6px;
   background: transparent;
-  color: var(--ink-2);
+  color: var(--text-2);
 }
 
 .kiosk-book-card > button svg,
@@ -710,7 +710,7 @@
 }
 
 .kiosk-check {
-  color: var(--ok);
+  color: var(--success);
   animation: kiosk-check-in 240ms ease-out both;
 }
 
@@ -724,20 +724,20 @@
   flex-wrap: wrap;
   justify-content: center;
   gap: 12px 28px;
-  color: var(--ink-2);
+  color: var(--text-2);
   font-size: 15px;
 }
 
 .kiosk-rule-hints span + span::before {
   content: "·";
   margin-right: 16px;
-  color: var(--brass);
+  color: var(--wood);
 }
 
 .kiosk-subheading,
 .kiosk-section-intro {
   margin: 0;
-  font: 600 23px Fraunces, "Noto Serif SC", serif;
+  font: 600 23px var(--font-serif);
 }
 
 .kiosk-flow-actions {
@@ -754,7 +754,7 @@
   border: 1px solid var(--line);
   border-radius: 6px;
   background: transparent;
-  color: var(--ink-2);
+  color: var(--text-2);
 }
 
 .kiosk-flow-actions .qa-button,
@@ -792,37 +792,37 @@
 }
 
 .kiosk-checkable em {
-  color: #81271f;
+  color: var(--danger);
   font-size: 14px;
   font-style: normal;
 }
 
 .kiosk-checkable.is-blocked {
-  background: color-mix(in srgb, var(--paper-2) 55%, var(--surface));
+  background: color-mix(in srgb, var(--surface-2) 55%, var(--surface));
 }
 
 .kiosk-new-date {
   min-width: 90px;
   color: var(--accent);
-  font: 18px "JetBrains Mono", monospace;
+  font: 18px var(--font-mono);
 }
 
 .kiosk-date {
   display: grid;
   gap: 3px;
-  color: var(--ink-2);
+  color: var(--text-2);
   font-size: 14px;
   text-align: right;
 }
 
 .kiosk-date strong {
-  color: var(--ink);
-  font: 18px "JetBrains Mono", monospace;
+  color: var(--text);
+  font: 18px var(--font-mono);
 }
 
 .kiosk-date small,
 .kiosk-date.is-danger { color: var(--danger); }
-.kiosk-date.is-warn { color: #89580d; }
+.kiosk-date.is-warn { color: var(--warn); }
 
 .kiosk-search-row {
   width: 100%;
@@ -838,13 +838,13 @@
   justify-items: center;
   align-content: center;
   gap: 12px;
-  color: var(--ink-2);
+  color: var(--text-2);
 }
 
 .kiosk-empty .qa-spines {
   width: 120px;
   height: 78px;
-  color: var(--brass);
+  color: var(--wood);
 }
 
 .kiosk-empty .qa-spines line {
@@ -885,8 +885,8 @@
 }
 
 .kiosk-help-steps b {
-  color: var(--brass);
-  font: 48px "JetBrains Mono", monospace;
+  color: var(--wood);
+  font: 48px var(--font-mono);
 }
 
 .kiosk-help p {
@@ -895,7 +895,7 @@
 }
 
 .kiosk-help p small {
-  color: var(--ink-2);
+  color: var(--text-2);
   font-size: 17px;
 }
 
@@ -921,15 +921,15 @@
   height: 104px;
   display: grid;
   place-items: center;
-  border: 2px solid var(--ok);
+  border: 2px solid var(--success);
   border-radius: 50%;
-  color: var(--ok);
+  color: var(--success);
 }
 
 .kiosk-result-mark.offline,
 .kiosk-result-mark.warning {
-  border-color: var(--brass);
-  color: var(--brass);
+  border-color: var(--wood);
+  color: var(--wood);
 }
 
 .kiosk-result-mark svg {
@@ -939,12 +939,12 @@
 
 .kiosk-result h1 {
   margin: 0;
-  font: 600 38px/1.2 Fraunces, "Noto Serif SC", serif;
+  font: 600 38px/1.2 var(--font-serif);
 }
 
 .kiosk-result > p {
   margin: 0;
-  color: var(--ink-2);
+  color: var(--text-2);
 }
 
 .kiosk-result-items {
@@ -979,7 +979,7 @@
   display: grid;
   place-items: center;
   padding: 24px;
-  background: rgba(16, 40, 30, .46);
+  background: rgba(35, 24, 21, .46);
 }
 
 .kiosk-timeout > div {
@@ -997,7 +997,7 @@
 .kiosk-timeout svg {
   width: 46px;
   height: 46px;
-  color: var(--brass);
+  color: var(--wood);
 }
 
 .kiosk-timeout h2 {
@@ -1005,7 +1005,7 @@
 }
 
 .kiosk-timeout p {
-  color: var(--ink-2);
+  color: var(--text-2);
 }
 
 .kiosk-timeout button {
@@ -1025,9 +1025,9 @@
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
-  border-top: 2px solid var(--brass);
-  background: #12251c;
-  color: #f4f0e7;
+  border-top: 2px solid var(--wood);
+  background: var(--burgundy-deep);
+  color: var(--cream);
   box-shadow: 0 -12px 40px rgba(0, 0, 0, .24);
 }
 
@@ -1036,13 +1036,13 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font: 14px "JetBrains Mono", monospace;
+  font: 14px var(--font-mono);
 }
 
 .kiosk-dev-head button {
   width: 48px;
   height: 48px;
-  border: 1px solid #637269;
+  border: 1px solid rgba(251, 241, 225, .35);
   border-radius: 4px;
   background: transparent;
   color: inherit;
@@ -1055,17 +1055,17 @@
 .kiosk-dev-drawer p {
   grid-column: 1 / -1;
   margin: 0;
-  color: #bdc9bf;
+  color: rgba(251, 241, 225, .72);
   font-size: 14px;
 }
 
 .kiosk-dev-drawer > button {
   min-height: 64px;
   padding: 8px 12px;
-  border: 1px solid #68786e;
+  border: 1px solid rgba(251, 241, 225, .3);
   border-radius: 4px;
-  background: #1d382a;
-  color: #f4f0e7;
+  background: color-mix(in srgb, var(--burgundy) 70%, var(--burgundy-deep));
+  color: var(--cream);
   font-size: 15px;
 }
 

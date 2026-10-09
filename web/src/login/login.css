@@ -1,11 +1,11 @@
 .login-page {
-  --login-forest: #0B1712;
-  --login-forest-2: #13241D;
+  --login-forest: var(--burgundy-deep);
+  --login-forest-2: var(--burgundy);
   min-height: 100vh;
   display: grid;
   grid-template-columns: minmax(0, 55fr) minmax(420px, 45fr);
-  background: var(--paper);
-  color: var(--ink);
+  background: var(--bg);
+  color: var(--text);
   position: relative;
   overflow: hidden;
 }
@@ -28,9 +28,9 @@
 
 .login-brand-panel {
   min-height: 100vh;
-  color: #F4F0E7;
+  color: var(--cream);
   background:
-    radial-gradient(circle at 82% 18%, rgba(176, 122, 30, 0.18), transparent 28%),
+    radial-gradient(circle at 82% 18%, rgba(214, 56, 79, 0.28), transparent 28%),
     linear-gradient(135deg, var(--login-forest), var(--login-forest-2));
   position: relative;
   overflow: hidden;
@@ -45,8 +45,8 @@
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(90deg, rgba(244, 240, 231, 0.06) 1px, transparent 1px) 0 0 / 72px 72px,
-    linear-gradient(0deg, rgba(244, 240, 231, 0.03) 1px, transparent 1px) 0 0 / 72px 72px;
+    linear-gradient(90deg, rgba(251, 241, 225, 0.06) 1px, transparent 1px) 0 0 / 72px 72px,
+    linear-gradient(0deg, rgba(251, 241, 225, 0.03) 1px, transparent 1px) 0 0 / 72px 72px;
   pointer-events: none;
 }
 
@@ -63,9 +63,9 @@
 }
 
 .login-brand-mark .qa-logo {
-  background: rgba(244, 240, 231, 0.08);
-  border-color: rgba(244, 240, 231, 0.22);
-  color: #D9A441;
+  background: rgba(251, 241, 225, 0.08);
+  border-color: rgba(251, 241, 225, 0.22);
+  color: var(--blush);
 }
 
 .login-brand-mark strong,
@@ -75,14 +75,14 @@
 
 .login-brand-mark strong {
   font-size: 18px;
-  color: #FBF9F4;
+  color: var(--paper);
 }
 
 .login-brand-mark span {
   margin-top: 3px;
-  font-family: "JetBrains Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 12px;
-  color: rgba(244, 240, 231, 0.68);
+  color: rgba(251, 241, 225, 0.68);
   text-transform: uppercase;
 }
 
@@ -92,8 +92,8 @@
 
 .login-copy p {
   margin: 0 0 18px;
-  color: #D9A441;
-  font-family: "JetBrains Mono", monospace;
+  color: var(--blush);
+  font-family: var(--font-mono);
   font-size: 12px;
   letter-spacing: 0;
 }
@@ -101,7 +101,7 @@
 .login-copy h1 {
   margin: 0;
   max-width: 720px;
-  font-family: Fraunces, "Noto Serif SC", serif;
+  font-family: var(--font-serif);
   font-size: clamp(3rem, 6.2vw, 5.7rem);
   line-height: 0.98;
   font-weight: 600;
@@ -113,7 +113,7 @@
 
 .login-copy h1 span + span {
   margin-top: 14px;
-  color: rgba(244, 240, 231, 0.72);
+  color: rgba(251, 241, 225, 0.72);
   font-size: 0.42em;
   line-height: 1.18;
 }
@@ -126,25 +126,25 @@
 }
 
 .login-live-facts div {
-  border-top: 1px solid rgba(244, 240, 231, 0.2);
+  border-top: 1px solid rgba(251, 241, 225, 0.2);
   padding-top: 12px;
 }
 
 .login-live-facts dt,
 .login-live-facts dd {
   margin: 0;
-  font-family: "JetBrains Mono", monospace;
+  font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
 }
 
 .login-live-facts dt {
-  color: rgba(244, 240, 231, 0.6);
+  color: rgba(251, 241, 225, 0.6);
   font-size: 11px;
 }
 
 .login-live-facts dd {
   margin-top: 8px;
-  color: #FBF9F4;
+  color: var(--paper);
   font-size: clamp(1.7rem, 3vw, 2.7rem);
 }
 
@@ -154,38 +154,38 @@
   width: calc(100% + 120px);
   height: min(43vh, 360px);
   margin: 0 -72px;
-  color: #F4F0E7;
+  color: var(--cream);
 }
 
 .login-spines rect:first-child {
-  fill: rgba(244, 240, 231, 0.22);
+  fill: rgba(251, 241, 225, 0.22);
 }
 
 .login-spines g {
-  color: #6FB38F;
+  color: #8FE0B4;
   animation: login-spine-shimmer 5.8s ease-in-out infinite alternate;
 }
 
 .login-spines g:nth-of-type(3n) {
-  color: #8FAE9D;
+  color: rgba(251, 241, 225, 0.62);
 }
 
 .login-spines g:nth-of-type(4n) {
-  color: #F4F0E7;
+  color: var(--cream);
 }
 
 .login-spines g rect:first-child {
   fill: url("#spineShimmer");
-  stroke: rgba(244, 240, 231, 0.18);
+  stroke: rgba(251, 241, 225, 0.18);
 }
 
 .login-spines g rect:last-child {
-  fill: rgba(244, 240, 231, 0.18);
+  fill: rgba(251, 241, 225, 0.18);
 }
 
 .login-spines g.is-lit {
-  color: #D9A441;
-  filter: drop-shadow(0 0 14px rgba(217, 164, 65, 0.48));
+  color: var(--blush);
+  filter: drop-shadow(0 0 14px rgba(244, 182, 176, 0.5));
 }
 
 @keyframes login-spine-shimmer {
@@ -199,7 +199,7 @@
   min-height: 100vh;
   background:
     linear-gradient(90deg, color-mix(in srgb, var(--line) 30%, transparent) 1px, transparent 1px) 0 0 / 76px 76px,
-    var(--paper);
+    var(--bg);
   display: grid;
   align-content: center;
   justify-items: center;
@@ -218,15 +218,15 @@
 }
 
 .login-form-heading p {
-  font-family: "JetBrains Mono", monospace;
-  color: var(--brass);
+  font-family: var(--font-mono);
+  color: var(--wood);
   font-size: 12px;
   text-transform: uppercase;
 }
 
 .login-form-heading h2 {
   margin-top: 10px;
-  font-family: Fraunces, "Noto Serif SC", serif;
+  font-family: var(--font-serif);
   font-size: 40px;
   line-height: 1.05;
 }
@@ -234,7 +234,7 @@
 .login-form-heading span {
   display: block;
   margin-top: 12px;
-  color: var(--ink-2);
+  color: var(--text-2);
   line-height: 1.5;
 }
 
@@ -259,7 +259,7 @@
 .login-field {
   display: grid;
   gap: 7px;
-  color: var(--ink-2);
+  color: var(--text-2);
   font-size: 14px;
 }
 
@@ -269,7 +269,7 @@
   border: 1px solid var(--line);
   border-radius: 6px;
   background: var(--surface);
-  color: var(--ink);
+  color: var(--text);
   padding: 0 12px;
 }
 
@@ -286,7 +286,7 @@
 }
 
 .login-password-row:focus-within {
-  outline: 2px solid var(--brass);
+  outline: 2px solid var(--wood);
   outline-offset: 2px;
 }
 
@@ -313,7 +313,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  color: var(--ink-2);
+  color: var(--text-2);
   font-size: 13px;
 }
 
@@ -346,7 +346,7 @@
   margin-top: 18px;
   border-top: 1px solid var(--line);
   padding-top: 14px;
-  color: var(--ink-2);
+  color: var(--text-2);
   font-size: 13px;
 }
 
@@ -367,7 +367,7 @@
   border: 1px solid var(--line);
   border-radius: 6px;
   background: var(--surface);
-  color: var(--ink);
+  color: var(--text);
   cursor: pointer;
 }
 
@@ -380,8 +380,8 @@
   justify-content: space-between;
   align-items: center;
   gap: 12px;
-  color: var(--ink-2);
-  font-family: "JetBrains Mono", monospace;
+  color: var(--text-2);
+  font-family: var(--font-mono);
   font-size: 12px;
 }
 
@@ -391,7 +391,7 @@
   z-index: 30;
   display: grid;
   place-items: center;
-  background: color-mix(in srgb, var(--ink) 42%, transparent);
+  background: color-mix(in srgb, var(--text) 42%, transparent);
   padding: 20px;
 }
 
@@ -400,7 +400,7 @@
   border: 1px solid var(--line);
   border-radius: 14px;
   background: var(--surface);
-  color: var(--ink);
+  color: var(--text);
   padding: 22px;
   position: relative;
 }
@@ -414,7 +414,7 @@
   border: 0;
   border-radius: 6px;
   background: transparent;
-  color: var(--ink-2);
+  color: var(--text-2);
   display: grid;
   place-items: center;
   cursor: pointer;
@@ -428,13 +428,13 @@
 .login-dialog h2 {
   margin: 0;
   padding-right: 44px;
-  font-family: Fraunces, "Noto Serif SC", serif;
+  font-family: var(--font-serif);
   font-size: 28px;
 }
 
 .login-dialog p {
   margin: 8px 0 18px;
-  color: var(--ink-2);
+  color: var(--text-2);
   line-height: 1.5;
 }
 
