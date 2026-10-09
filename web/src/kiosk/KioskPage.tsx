@@ -8,6 +8,7 @@ import {
 import {
   initialKioskState, kioskReducer, type Book, type KioskResult, type KioskScreen, type Loan
 } from "./kioskState";
+import { BorrowFlow, BorrowReceipt } from "./BorrowFlow";
 import "./kiosk.css";
 
 const screenCopy: Record<KioskScreen, { zh: string; en: string }> = {
@@ -212,13 +213,16 @@ export function KioskPage() {
     const trimmed = query.trim();
     if (!trimmed) return;
     let books: Book[];
+    let searched = true;
     try {
       books = await listBooks(trimmed);
     } catch {
       books = await cachedBooks();
+      searched = false;
     }
     const candidates = [...books, ...state.books.filter((item) => !books.some((book) => book.id === item.id))];
-    const book = candidates.find((item) => [item.id, item.isbn, item.rfid_tag].includes(trimmed)) ?? candidates[0];
+    // An unknown tag must not silently pick an arbitrary cached book; only trust a real search hit.
+    const book = candidates.find((item) => [item.id, item.isbn, item.rfid_tag].includes(trimmed)) ?? (searched ? books[0] : undefined);
     if (!book) {
       dispatch({ type: "INPUT_ERROR", message: "没有找到这本书 / Book not found." });
       return;
@@ -369,7 +373,7 @@ export function KioskPage() {
       ) : state.screen === "home" && state.user ? (
         <HomeScreen user={state.user.name} openLoans={openLoans} dueSoon={dueSoon} overdue={overdueLoans} onNavigate={go} />
       ) : state.screen === "borrow" ? (
-        <BorrowScreen books={state.books} scannedBookIds={state.scannedBookIds} step={state.borrowStep} input={bookInput} setInput={setBookInput} error={state.error || state.inputError} onAdd={() => void addBook(bookInput)} onRemove={(id) => dispatch({ type: "REMOVE_BOOK", bookId: id })} onNext={() => dispatch({ type: "SET_BORROW_STEP", step: state.borrowStep === "scan" ? "confirm" : "receipt" })} onConfirm={() => void confirmBorrow()} onBack={() => go("home")} busy={busy} loanDays={policy.loanDays} maxLoans={policy.maxLoans} />
+        <BorrowScreen books={state.books} scannedBookIds={state.scannedBookIds} step={state.borrowStep} input={bookInput} setInput={setBookInput} error={state.error || state.inputError} onAdd={() => addBook(bookInput)} onRemove={(id) => dispatch({ type: "REMOVE_BOOK", bookId: id })} onNext={() => dispatch({ type: "SET_BORROW_STEP", step: state.borrowStep === "scan" ? "confirm" : "receipt" })} onConfirm={() => void confirmBorrow()} onBack={() => go("home")} busy={busy} loanDays={policy.loanDays} maxLoans={policy.maxLoans} activeLoanCount={activeLoans.length} />
       ) : state.screen === "return" ? (
         <ReturnScreen loans={activeLoans} finePerDayCents={policy.finePerDayCents} onReturn={(loan) => void performReturn(loan)} onManualReturn={() => {
           const book = state.books.find((item) => [item.id, item.isbn, item.rfid_tag].includes(returnInput.trim()));
@@ -386,6 +390,8 @@ export function KioskPage() {
         <LoansScreen loans={activeLoans} onBack={() => go("home")} />
       ) : state.screen === "help" ? (
         <HelpScreen onCall={() => void callSupport()} onBack={() => go("home")} busy={busy} />
+      ) : state.screen === "result" && state.result && state.flow === "borrow" && state.result.kind !== "warning" ? (
+        <BorrowReceipt result={state.result} loanCount={activeLoans.length} onDone={() => go("home")} />
       ) : state.screen === "result" && state.result ? (
         <ResultScreen result={state.result} onDone={() => go("home")} />
       ) : null}
@@ -465,24 +471,8 @@ function KioskShell({ title, onBack, children }: { title: { zh: string; en: stri
   return <section className="kiosk-shell"><div className="kiosk-shell-heading">{onBack ? <button className="kiosk-back" onClick={onBack}>←</button> : null}<h1>{title.zh}<small>{title.en}</small></h1></div>{children}</section>;
 }
 
-function BorrowScreen({ books, scannedBookIds, step, input, setInput, error, onAdd, onRemove, onNext, onConfirm, onBack, busy, loanDays, maxLoans }: { books: Book[]; scannedBookIds: string[]; step: "scan" | "confirm" | "receipt"; input: string; setInput: (value: string) => void; error: string; onAdd: () => void; onRemove: (id: string) => void; onNext: () => void; onConfirm: () => void; onBack: () => void; busy: boolean; loanDays: number; maxLoans: number }) {
-  const scanned = books.filter((book) => scannedBookIds.includes(book.id) && book.status === "on_shelf");
-  return <KioskShell title={screenCopy.borrow} onBack={onBack}>
-    <div className="kiosk-flow">
-      <div className="kiosk-stepper"><span className={step === "scan" ? "active" : ""}>1 扫描 / Scan</span><span className={step === "confirm" ? "active" : ""}>2 确认 / Confirm</span><span>3 完成 / Done</span></div>
-      {step === "scan" ? <><div className="kiosk-tray"><div className="kiosk-tray-ring">RFID</div><h2>请将图书放在 RFID 托盘上</h2><p>Place books on the tray · 也可手动输入 RFID / ISBN</p><div className="kiosk-manual-row"><input value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") onAdd(); }} placeholder="RFID-000001 / ISBN" /><button onClick={onAdd}>添加 / Add</button></div></div><div className="kiosk-book-list">{scanned.slice(-5).map((book) => <BookCard key={book.id} book={book} onRemove={() => onRemove(book.id)} />)}</div><RuleHints loanDays={loanDays} maxLoans={maxLoans} /></> : <><h2 className="kiosk-subheading">请确认以下借阅 / Confirm these books</h2><div className="kiosk-book-list">{scanned.map((book) => <BookCard key={book.id} book={book} />)}</div><RuleHints loanDays={loanDays} maxLoans={maxLoans} /></>}
-      {error ? <p className="kiosk-error" role="alert"><AlertIcon />{error}</p> : null}
-      <div className="kiosk-flow-actions"><button onClick={onBack}>取消 / Cancel</button>{step === "scan" ? <Button onClick={onNext} disabled={!scanned.length}>确认借阅 / Review</Button> : <Button loading={busy} onClick={onConfirm}>借阅并开闸 / Borrow & exit</Button>}</div>
-    </div>
-  </KioskShell>;
-}
-
-function BookCard({ book, onRemove }: { book: Book; onRemove?: () => void }) {
-  return <article className="kiosk-book-card"><span className="kiosk-spine" style={{ background: book.cover_color }} /><div><strong>{book.title}</strong><span>{book.author} · {book.shelf_location}</span><code>{book.rfid_tag}</code></div>{onRemove ? <button onClick={onRemove} aria-label={`Remove ${book.title}`}><CloseIcon /></button> : <CheckIcon className="kiosk-check" />}</article>;
-}
-
-function RuleHints({ loanDays, maxLoans }: { loanDays: number; maxLoans: number }) {
-  return <div className="kiosk-rule-hints"><span>最多借阅 {maxLoans} 本 / Max {maxLoans} loans</span><span>期限 {loanDays} 天 / {loanDays} days</span><span>闸机已联动 / Gate linked</span></div>;
+function BorrowScreen(props: Parameters<typeof BorrowFlow>[0]) {
+  return <KioskShell title={screenCopy.borrow} onBack={props.onBack}><BorrowFlow {...props} /></KioskShell>;
 }
 
 function ReturnScreen({ loans, finePerDayCents, onReturn, onManualReturn, input, setInput, onBack, busy, error }: { loans: Loan[]; finePerDayCents: number; onReturn: (loan: Loan) => void; onManualReturn: () => void; input: string; setInput: (value: string) => void; onBack: () => void; busy: boolean; error: string }) {

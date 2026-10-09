@@ -167,6 +167,7 @@ export function StatusBadge(props: { status: BookStatus; label?: string } | { to
 /** Library catalogue card: burgundy spine strip, serif title, call number in mono. */
 export function CatalogCard({
   callNumber,
+  callNumberLabel,
   title,
   author,
   location,
@@ -175,6 +176,8 @@ export function CatalogCard({
   children
 }: {
   callNumber: string;
+  /** Overrides the "call no." label, e.g. when only an ISBN is known. */
+  callNumberLabel?: string;
   title: string;
   author?: string;
   location?: string;
@@ -196,7 +199,7 @@ export function CatalogCard({
         {author || location ? (
           <dl>
             {author ? <><dt>{t("catalog.author")}</dt><dd>{author}</dd></> : null}
-            <dt>{t("catalog.callNumber")}</dt><dd className="mono">{callNumber}</dd>
+            <dt>{callNumberLabel ?? t("catalog.callNumber")}</dt><dd className="mono">{callNumber}</dd>
             {location ? <><dt>{t("catalog.location")}</dt><dd>{location}</dd></> : null}
           </dl>
         ) : null}
