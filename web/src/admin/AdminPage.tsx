@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Navigate, NavLink, Route, Routes, useLocation, useNavigate } from "react-router";
 import { Button, LangSwitch, SegmentedControl, StatusBadge, ToastProvider, useToast } from "../shared/components";
@@ -32,6 +32,9 @@ const NAV: NavItem[] = [
 ];
 
 const THEME_KEY = "ul-admin-theme";
+
+// Loaded on demand so ECharts is only downloaded for the wallboard.
+const WallboardPage = lazy(() => import("./wallboard/WallboardPage").then((module) => ({ default: module.WallboardPage })));
 
 function readTheme(): Theme {
   try {
@@ -79,7 +82,21 @@ function AdminGate() {
   if (state.status === "error") return <main className="admin-splash"><ErrorPanel error={state.error} onRetry={() => setNonce((value) => value + 1)} /></main>;
   if (!state.user) return <Navigate to="/login" replace />;
   if (state.user.role === "reader") return <Navigate to="/kiosk" replace />;
-  return <AdminShell user={state.user} />;
+  return <AdminRoutes user={state.user} />;
+}
+
+/** The wallboard is full-bleed (no sidebar); everything else lives in the shell. */
+function AdminRoutes({ user }: { user: SessionUser }) {
+  const { t } = useTranslation();
+  const location = useLocation();
+  if (location.pathname.startsWith("/admin/wallboard")) {
+    return (
+      <Suspense fallback={<main className="admin-splash" data-theme="wallboard"><BookSpinesBand count={24} height={40} className="is-small" /><p>{t("admin.wallboard.loading")}</p></main>}>
+        <WallboardPage />
+      </Suspense>
+    );
+  }
+  return <AdminShell user={user} />;
 }
 
 function RequireRole({ user, roles, children }: { user: SessionUser; roles: Role[]; children: ReactNode }) {
@@ -206,6 +223,7 @@ function AdminShell({ user }: { user: SessionUser }) {
 
   const commands = useMemo<Command[]>(() => [
     ...nav.map((item) => ({ id: `go-${item.key}`, group: t("admin.palette.pages"), label: t(`admin.nav.${item.key}`), hint: item.path ? `/admin/${item.path}` : "/admin", run: () => navigate(item.path ? `/admin/${item.path}` : "/admin") })),
+    { id: "go-wallboard", group: t("admin.palette.pages"), label: t("admin.nav.wallboard"), hint: "/admin/wallboard", run: () => navigate("/admin/wallboard") },
     { id: "theme", group: t("admin.palette.actions"), label: theme === "dark" ? t("admin.palette.light") : t("admin.palette.dark"), run: () => setTheme((value) => (value === "dark" ? "light" : "dark")) },
     { id: "lang", group: t("admin.palette.actions"), label: t("admin.palette.lang"), run: () => void i18n.changeLanguage(i18n.language === "en" ? "zh-CN" : "en") },
     { id: "logout", group: t("admin.palette.actions"), label: t("admin.logout"), run: () => void signOut() }
@@ -229,6 +247,11 @@ function AdminShell({ user }: { user: SessionUser }) {
             </NavLink>
           ))}
         </nav>
+        <NavLink to="/admin/wallboard" className="admin-drawer-link admin-wallboard-link">
+          <span className="admin-drawer-plate mono" aria-hidden="true">WB</span>
+          <span>{t("admin.nav.wallboard")}</span>
+          <i aria-hidden="true" />
+        </NavLink>
         <div className="admin-sidebar-user">
           <span className="admin-avatar" aria-hidden="true">{user.name.slice(0, 1)}</span>
           <div>
