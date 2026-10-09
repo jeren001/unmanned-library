@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes, InputHTMLAttributes, KeyboardEvent, ReactNode, SelectHTMLAttributes } from "react";
+import type { ButtonHTMLAttributes, ComponentProps, KeyboardEvent, ReactNode, SelectHTMLAttributes } from "react";
 import { createContext, useCallback, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AlertIcon, BellIcon, CheckIcon, ChevronIcon, CloseIcon, InfoIcon, OfflineIcon, SpinnerIcon } from "./icons";
@@ -48,7 +48,7 @@ export function TextField({
   error,
   mono = false,
   ...props
-}: InputHTMLAttributes<HTMLInputElement> & { label: string; hint?: string; error?: string; mono?: boolean }) {
+}: ComponentProps<"input"> & { label: string; hint?: string; error?: string; mono?: boolean }) {
   const autoId = useId();
   const id = props.id ?? props.name ?? autoId;
   const describedBy = error ? `${id}-error` : hint ? `${id}-hint` : undefined;
@@ -75,8 +75,11 @@ export function Select({ label, children, ...props }: SelectHTMLAttributes<HTMLS
 
 type TabItem = string | { value: string; label: ReactNode };
 
-/** Folder tabs: the selected tab joins the paper panel below it. */
-export function Tabs({ items, value, onChange, label }: { items: TabItem[]; value: string; onChange: (value: string) => void; label?: string }) {
+/**
+ * Folder tabs: the selected tab joins the paper panel below it.
+ * With `idPrefix`, tab ids are `${idPrefix}-tab-${value}` and point at panels `${idPrefix}-panel-${value}`.
+ */
+export function Tabs({ items, value, onChange, label, idPrefix }: { items: TabItem[]; value: string; onChange: (value: string) => void; label?: string; idPrefix?: string }) {
   const { t } = useTranslation();
   const listRef = useRef<HTMLDivElement>(null);
   const options = items.map((item) => (typeof item === "string" ? { value: item, label: item } : item));
@@ -101,6 +104,8 @@ export function Tabs({ items, value, onChange, label }: { items: TabItem[]; valu
           key={option.value}
           type="button"
           role="tab"
+          id={idPrefix ? `${idPrefix}-tab-${option.value}` : undefined}
+          aria-controls={idPrefix ? `${idPrefix}-panel-${option.value}` : undefined}
           aria-selected={value === option.value}
           tabIndex={value === option.value ? 0 : -1}
           onClick={() => onChange(option.value)}
