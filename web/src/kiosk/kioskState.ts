@@ -41,7 +41,7 @@ export type KioskResult = {
   kind: "success" | "offline" | "warning";
   title: string;
   detail: string;
-  items?: Array<{ title: string; dueAt?: string; shelf?: string }>;
+  items?: Array<{ title: string; dueAt?: string; shelf?: string; overdueDays?: number; fineCents?: number }>;
   queuedCount?: number;
 };
 

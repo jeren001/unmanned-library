@@ -22,6 +22,7 @@ import {
   ToastProvider,
   useToast
 } from "./components";
+import { ShelfRouteMap } from "./ShelfRouteMap";
 import { BookmarkRibbon, BookSpinesBand, CatalogDrawer, CountUp, PageTurn, StaggerList } from "./motion";
 import "./design.css";
 
@@ -61,6 +62,7 @@ function Showcase() {
   const [drawerOpen, setDrawerOpen] = useState(true);
   const [ribbon, setRibbon] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [shelf, setShelf] = useState("EAST-B-17");
   const [kpi, setKpi] = useState({ shelf: 42, loans: 128, overdue: 9, online: 96 });
 
   const steps = [t("design.step.place"), t("design.step.confirm"), t("design.step.receipt")];
@@ -286,6 +288,16 @@ function Showcase() {
             <p className="qa-showcase-note">{t("design.ribbon.body")}</p>
           </div>
           <Button variant="ghost" onClick={() => setRibbon((value) => value + 1)}>{t("action.replay")}</Button>
+        </Card>
+
+        <Card title={t("design.section.shelfMap")}>
+          <ShelfRouteMap location={shelf} />
+          <div className="qa-row">
+            {["EAST-B-17", "EAST-G-05", "EAST-D-38"].map((value) => (
+              <button key={value} type="button" className="qa-chip mono" aria-pressed={shelf === value} onClick={() => setShelf(value)}>{value}</button>
+            ))}
+          </div>
+          <p className="qa-showcase-note">{t("design.shelfMap.hint")}</p>
         </Card>
 
         <Card title={t("design.section.spines")} className="is-wide">

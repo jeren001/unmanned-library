@@ -800,3 +800,78 @@
     translate: none;
   }
 }
+
+/* ---------- Shelf route map ---------- */
+
+.qa-shelf-map {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.qa-shelf-floor {
+  fill: var(--surface);
+  stroke: var(--line);
+}
+
+.qa-shelf-block {
+  fill: var(--line);
+}
+
+.qa-shelf-zone {
+  fill: var(--text-2);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.qa-shelf-target {
+  fill: var(--rose);
+  animation: qa-shelf-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes qa-shelf-pulse {
+  50% { opacity: .45; }
+}
+
+.qa-shelf-callout {
+  fill: var(--accent);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.qa-shelf-route {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 3;
+  stroke-dasharray: 7 7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  animation: qa-shelf-march 1s linear infinite;
+}
+
+@keyframes qa-shelf-march {
+  from { stroke-dashoffset: 28; }
+  to { stroke-dashoffset: 0; }
+}
+
+.qa-shelf-walker {
+  fill: var(--rose);
+}
+
+.qa-shelf-kiosk {
+  fill: var(--accent);
+}
+
+.qa-shelf-here {
+  fill: var(--text);
+  font-size: 11px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .qa-shelf-target,
+  .qa-shelf-route {
+    animation: none;
+  }
+}

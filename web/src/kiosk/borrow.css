@@ -205,51 +205,6 @@
   height: 20px;
 }
 
-.kiosk-borrow-error {
-  position: relative;
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  overflow: hidden;
-  padding: 14px 16px 14px 34px;
-  border: 1px solid color-mix(in srgb, var(--danger) 40%, var(--line));
-  border-radius: 12px;
-  background: var(--surface);
-}
-
-.kiosk-borrow-error-spine {
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 18px;
-  background: var(--rose);
-}
-
-.kiosk-borrow-error > svg {
-  width: 26px;
-  height: 26px;
-  flex: 0 0 auto;
-  color: var(--danger);
-}
-
-.kiosk-borrow-error strong {
-  display: block;
-  font-family: var(--font-serif);
-  font-size: 20px;
-  color: var(--danger);
-}
-
-/* The message reuses .kiosk-error for tests and screen readers but sits plain inside the slip. */
-.kiosk-page .kiosk-borrow-error .kiosk-error {
-  display: block;
-  margin-top: 2px;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--text);
-}
-
 /* ---------- Step 3: receipt ---------- */
 
 .kiosk-page .kiosk-borrow-result {

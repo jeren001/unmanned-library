@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Button, CatalogCard, StatusBadge, Stepper } from "../shared/components";
 import { AlertIcon, CheckIcon, CloseIcon } from "../shared/icons";
+import { callNumberOf, ErrorCard, formatDate } from "./kioskUi";
 import { animate, BookmarkRibbon, CatalogDrawer, CountUp, PageTurn, prefersReducedMotion, StaggerList } from "../shared/motion";
 import type { Book, KioskResult } from "./kioskState";
 import "./borrow.css";
@@ -12,14 +13,6 @@ import "./borrow.css";
 
 const STEPS = ["放书 / Put", "确认 / Confirm", "取小票 / Receipt"];
 const MIN_READ_MS = 900;
-
-function formatDate(value: string | Date) {
-  return new Intl.DateTimeFormat("zh-CN", { month: "short", day: "numeric" }).format(new Date(value));
-}
-
-function callNumberOf(book: Book) {
-  return book.call_number ? { value: book.call_number, label: "索书号 / Call no." } : { value: book.isbn, label: "ISBN" };
-}
 
 export function BorrowStepper({ step }: { step: 0 | 1 | 2 }) {
   return <div className="kiosk-borrow-stepper"><Stepper steps={STEPS} current={step} /></div>;
@@ -60,7 +53,7 @@ export function BorrowFlow(props: BorrowFlowProps) {
         )}
       </PageTurn>
       <LoanLimit maxLoans={maxLoans} activeLoanCount={activeLoanCount} picking={available.length} overLimit={overLimit} />
-      {error ? <BorrowError message={error} /> : null}
+      {error ? <ErrorCard title="无法借阅 / Cannot borrow" message={error} /> : null}
       <div className="kiosk-flow-actions">
         <button onClick={onBack}>取消 / Cancel</button>
         {step === "scan"
@@ -193,20 +186,6 @@ function LoanLimit({ maxLoans, activeLoanCount, picking, overLimit }: { maxLoans
       <span>已借 <b>{activeLoanCount}</b> 本 / On loan</span>
       <span>本次 <b>{picking}</b> 本 / This time</span>
       {overLimit ? <strong><AlertIcon />超出借阅上限 / Over the loan limit</strong> : null}
-    </div>
-  );
-}
-
-/** Error slip in the catalogue-card language: rose spine, serif heading, message. */
-function BorrowError({ message }: { message: string }) {
-  return (
-    <div className="kiosk-borrow-error" role="alert">
-      <span className="kiosk-borrow-error-spine" aria-hidden="true" />
-      <AlertIcon />
-      <div>
-        <strong>无法借阅 / Cannot borrow</strong>
-        <p className="kiosk-error">{message}</p>
-      </div>
     </div>
   );
 }
