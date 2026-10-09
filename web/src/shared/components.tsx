@@ -443,6 +443,26 @@ export function Stepper({ steps, current }: { steps: string[]; current: number }
   );
 }
 
+export type TimelineItem = { id: string; at: string; title: ReactNode; detail?: ReactNode; tone?: "default" | "accent" | "success" | "danger" };
+
+/** Vertical history timeline with dots; used in catalogue-card drawers. */
+export function Timeline({ items, emptyText }: { items: TimelineItem[]; emptyText?: string }) {
+  const listRef = useRef<HTMLOListElement>(null);
+  useStagger(listRef, [items], { step: 50, distance: 8, duration: 360 });
+  if (!items.length) return emptyText ? <p className="qa-timeline-empty">{emptyText}</p> : null;
+  return (
+    <ol ref={listRef} className="qa-timeline">
+      {items.map((item) => (
+        <li key={item.id} data-tone={item.tone ?? "default"}>
+          <time className="mono" dateTime={item.at}>{item.at.slice(0, 10)}</time>
+          <span>{item.title}</span>
+          {item.detail ? <small>{item.detail}</small> : null}
+        </li>
+      ))}
+    </ol>
+  );
+}
+
 export function EmptyState({ title, body, action }: { title: string; body?: string; action?: ReactNode }) {
   return (
     <div className="qa-empty">

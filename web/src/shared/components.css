@@ -626,6 +626,59 @@
   color: #FFFFFF;
 }
 
+/* ---------- Timeline ---------- */
+
+.qa-timeline {
+  margin: 12px 0 0;
+  padding: 0 0 0 16px;
+  border-left: 2px solid var(--line);
+  list-style: none;
+}
+
+.qa-timeline li {
+  position: relative;
+  display: grid;
+  gap: 1px;
+  margin: 0 0 12px;
+  font-size: 13px;
+}
+
+.qa-timeline li::before {
+  content: "";
+  position: absolute;
+  left: -22px;
+  top: 5px;
+  width: 10px;
+  height: 10px;
+  border: 2px solid var(--surface);
+  border-radius: 50%;
+  background: var(--text-2);
+}
+
+.qa-timeline li[data-tone="accent"]::before { background: var(--accent); }
+.qa-timeline li[data-tone="success"]::before { background: var(--success); }
+.qa-timeline li[data-tone="danger"]::before { background: var(--rose); }
+
+.qa-timeline time {
+  color: var(--text-2);
+  font-size: 12px;
+}
+
+.qa-timeline span {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.qa-timeline small {
+  color: var(--text-2);
+}
+
+.qa-timeline-empty {
+  margin: 12px 0 0;
+  color: var(--text-2);
+  font-size: 13px;
+}
+
 /* ---------- Empty state & skeleton ---------- */
 
 .qa-empty {

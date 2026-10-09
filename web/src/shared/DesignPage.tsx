@@ -16,6 +16,7 @@ import {
   StatCard,
   StatusBadge,
   Stepper,
+  Timeline,
   Tabs,
   TextField,
   Toast,
@@ -205,12 +206,21 @@ function Showcase() {
           <p className="qa-showcase-note">{t("design.table.hint")}</p>
           <Drawer contained open={Boolean(selected)} onClose={() => setSelected(null)} title={selected ? `《${selected.title}》` : ""}>
             {selected ? (
-              <dl>
-                <dt>{t("catalog.callNumber")}</dt><dd className="mono">{selected.callNumber}</dd>
-                <dt>{t("catalog.author")}</dt><dd>{selected.author}</dd>
-                <dt>{t("catalog.location")}</dt><dd className="mono">{selected.location}</dd>
-                <dt>{t("catalog.status")}</dt><dd><StatusBadge status={selected.status} /></dd>
-              </dl>
+              <>
+                <dl>
+                  <dt>{t("catalog.callNumber")}</dt><dd className="mono">{selected.callNumber}</dd>
+                  <dt>{t("catalog.author")}</dt><dd>{selected.author}</dd>
+                  <dt>{t("catalog.location")}</dt><dd className="mono">{selected.location}</dd>
+                  <dt>{t("catalog.status")}</dt><dd><StatusBadge status={selected.status} /></dd>
+                </dl>
+                <Timeline
+                  items={[
+                    { id: "3", at: "2026-11-01", title: t("design.timeline.borrowed"), detail: "R-2048", tone: "accent" },
+                    { id: "2", at: "2026-10-12", title: t("design.timeline.returned"), detail: "A-3-2", tone: "success" },
+                    { id: "1", at: "2026-09-20", title: t("design.timeline.borrowed"), detail: "R-1311", tone: "accent" }
+                  ]}
+                />
+              </>
             ) : null}
           </Drawer>
         </Card>
