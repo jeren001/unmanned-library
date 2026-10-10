@@ -55,6 +55,7 @@ export type AlertEvent = {
   dedupKey?: string;
   ts: string;
   ackedBy?: string | null;
+  actorId?: string | null;
   duplicate?: boolean;
 };
 
@@ -94,6 +95,8 @@ export type EventMap = {
   "gate.passed": GatePassedEvent;
   "alert.raised": AlertEvent;
   "alert.acked": AlertEvent;
+  "alert.resolved": AlertEvent;
+  "alert.noted": AlertEvent;
   "device.status_changed": DeviceStatusChangedEvent;
   "kpi.updated": KpiUpdatedEvent;
 };
@@ -114,6 +117,8 @@ export const EVENT_NAMES: EventName[] = [
   "gate.passed",
   "alert.raised",
   "alert.acked",
+  "alert.resolved",
+  "alert.noted",
   "device.status_changed",
   "kpi.updated"
 ];

@@ -888,7 +888,7 @@ device status is set to `online` and `last_seen_at` is refreshed.
 ### `GET /api/alerts`
 
 - **Role:** manage
-- **Request:** `GET /api/alerts?branchId=branch-east&status=open&limit=50&offset=0`
+- **Request:** `GET /api/alerts?branchId=branch-east&type=smoke&severity=critical&status=open&from=2026-10-01T00:00:00.000Z&to=2026-10-10T23:59:59.999Z&limit=50&offset=0`
 - **Response:**
 
 ```json
@@ -903,13 +903,63 @@ device status is set to `online` and `last_seen_at` is refreshed.
       "message": "smoke_ppm threshold exceeded: 20",
       "status": "open",
       "related_loan_id": null,
-      "related_clip_id": "clip-001"
+      "related_clip_id": "clip-001",
+      "device_name": "East Campus Library smoke 7",
+      "branch_name": "East Campus Library"
     }
   ]
 }
 ```
 
 - **Errors:** `400 INVALID_QUERY`, `401`, `403`, `500 INTERNAL_ERROR`
+- **Status:** implemented
+
+Filters: `branchId`, `type`, `severity`, `status`, `from`, `to`, `limit`,
+and `offset`.
+
+### `GET /api/alerts/:id`
+
+- **Role:** manage
+- **Request:** no body
+- **Response:**
+
+```json
+{
+  "data": {
+    "id": "alert-001",
+    "branch_id": "branch-east",
+    "device_id": "device-east-7",
+    "type": "smoke",
+    "severity": "critical",
+    "message": "smoke_ppm threshold exceeded: 20",
+    "status": "acked",
+    "related_clip_id": "clip-001",
+    "related_clip_path": "assets/placeholder.mp4",
+    "timeline": [
+      {
+        "kind": "created",
+        "actor_id": null,
+        "message": "smoke_ppm threshold exceeded: 20",
+        "ts": "2026-10-10T10:00:00.000Z"
+      },
+      {
+        "kind": "acked",
+        "actor_id": "librarian-001",
+        "message": "Alert acknowledged",
+        "ts": "2026-10-10T10:01:00.000Z"
+      },
+      {
+        "kind": "note",
+        "actor_id": "librarian-001",
+        "message": "Checked camera clip.",
+        "ts": "2026-10-10T10:02:00.000Z"
+      }
+    ]
+  }
+}
+```
+
+- **Errors:** `401`, `403`, `404 ALERT_NOT_FOUND`, `500 INTERNAL_ERROR`
 - **Status:** implemented
 
 ### `POST /api/alerts`
@@ -952,7 +1002,11 @@ device status is set to `online` and `last_seen_at` is refreshed.
 ### `POST /api/alerts/:id/ack`
 
 - **Role:** manage
-- **Request:** no body
+- **Request:**
+
+```json
+{ "note": "Investigating camera clip." }
+```
 - **Response:**
 
 ```json
@@ -965,13 +1019,17 @@ device status is set to `online` and `last_seen_at` is refreshed.
 }
 ```
 
-- **Errors:** `401`, `403`, `404 NOT_FOUND`, `500 INTERNAL_ERROR`
+- **Errors:** `400 INVALID_INPUT`, `401`, `403`, `404 ALERT_NOT_FOUND`, `500 INTERNAL_ERROR`
 - **Status:** implemented
 
 ### `POST /api/alerts/:id/resolve`
 
 - **Role:** manage
-- **Request:** no body
+- **Request:**
+
+```json
+{ "note": "Resolved after checking the gate event." }
+```
 - **Response:**
 
 ```json
@@ -984,8 +1042,77 @@ device status is set to `online` and `last_seen_at` is refreshed.
 }
 ```
 
-- **Errors:** `401`, `403`, `404 NOT_FOUND`, `500 INTERNAL_ERROR`
+- **Errors:** `400 INVALID_INPUT`, `401`, `403`, `404 ALERT_NOT_FOUND`, `500 INTERNAL_ERROR`
 - **Status:** implemented
+
+### `POST /api/alerts/bulk-ack`
+
+- **Role:** manage
+- **Request:**
+
+```json
+{
+  "ids": ["alert-001", "alert-002"],
+  "note": "Acknowledged from wallboard triage."
+}
+```
+
+- **Response:**
+
+```json
+{
+  "data": [
+    {
+      "id": "alert-001",
+      "status": "acked",
+      "acked_by": "librarian-001"
+    },
+    {
+      "id": "alert-002",
+      "status": "acked",
+      "acked_by": "librarian-001"
+    }
+  ]
+}
+```
+
+- **Errors:** `400 INVALID_INPUT`, `401`, `403`, `404 ALERT_NOT_FOUND`, `500 INTERNAL_ERROR`
+- **Status:** implemented
+
+### `POST /api/alerts/:id/notes`
+
+- **Role:** manage
+- **Request:**
+
+```json
+{ "note": "Smoke reading confirmed by camera review." }
+```
+
+- **Response:**
+
+```json
+{
+  "data": {
+    "id": "generated-uuid",
+    "alert_id": "alert-001",
+    "actor_id": "librarian-001",
+    "note": "Smoke reading confirmed by camera review.",
+    "created_at": "2026-10-10T10:02:00.000Z"
+  }
+}
+```
+
+- **Errors:** `400 INVALID_INPUT`, `401`, `403`, `404 ALERT_NOT_FOUND`, `500 INTERNAL_ERROR`
+- **Status:** implemented
+
+Alert rules are loaded from the `rules` table. `alert_thresholds.smoke_ppm.max`
+creates a critical `smoke` alert when exceeded; temperature and humidity
+thresholds create warning `threshold` alerts when out of band;
+`heartbeat_missed_intervals` defaults to `3` and creates `device_offline` when
+that many heartbeats are missed; unauthorized gate events or `RFID-UNKNOWN*`
+tags create `theft` alerts linked to the nearest camera clip. Repeated open
+alerts for the same branch, device, and type are de-duplicated for
+`alert_dedup_seconds` or 60 seconds by default.
 
 ### `GET /api/telemetry`
 
@@ -1297,6 +1424,8 @@ Heartbeat comments use `: keepalive 1728554400000`.
 | `gate.passed` | `{ "gateEventId": "gate-001", "branchId": "branch-east", "deviceId": "device-east-3", "direction": "out", "rfidTags": ["RFID-000001"], "authorized": true, "ts": "2026-10-10T10:00:00.000Z" }` |
 | `alert.raised` | `{ "alertId": "alert-001", "branchId": "branch-east", "deviceId": "device-east-7", "type": "smoke", "severity": "critical", "message": "smoke_ppm threshold exceeded: 20", "status": "open", "relatedClipId": null, "relatedLoanId": null, "ts": "2026-10-10T10:00:00.000Z" }` |
 | `alert.acked` | `{ "alertId": "alert-001", "branchId": "branch-east", "deviceId": "device-east-7", "type": "smoke", "severity": "critical", "message": "Smoke threshold exceeded.", "status": "acked", "ackedBy": "librarian-001", "ts": "2026-10-10T10:00:00.000Z" }` |
+| `alert.resolved` | `{ "alertId": "alert-001", "branchId": "branch-east", "deviceId": "device-east-7", "type": "smoke", "severity": "critical", "message": "Smoke threshold exceeded.", "status": "resolved", "relatedClipId": "clip-001", "relatedLoanId": null, "ts": "2026-10-10T10:03:00.000Z" }` |
+| `alert.noted` | `{ "alertId": "alert-001", "branchId": "branch-east", "deviceId": "device-east-7", "type": "smoke", "severity": "critical", "message": "Checked camera clip.", "status": "acked", "actorId": "librarian-001", "ts": "2026-10-10T10:02:00.000Z" }` |
 | `device.status_changed` | `{ "deviceId": "device-east-1", "branchId": "branch-east", "name": "East kiosk", "kind": "kiosk", "from": "online", "to": "offline", "reason": "scenario", "ts": "2026-10-10T10:00:00.000Z", "lastSeenAt": null, "missedIntervals": 3 }` |
 | `kpi.updated` | `{ "branchId": "branch-east", "stats": { "branches": 3, "books": 300, "readers": 60, "devicesOnline": 24, "devicesTotal": 30, "activeLoans": 30, "openAlerts": 12 }, "ts": "2026-10-10T10:00:00.000Z" }` |
 

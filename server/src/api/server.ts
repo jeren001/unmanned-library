@@ -34,6 +34,7 @@ export function createServer(filename?: string) {
   bus.subscribe("gate.passed", (event) => { void publishKpi(event.branchId); }, { name: "kpi.gate" });
   bus.subscribe("alert.raised", (event) => { void publishKpi(event.branchId); }, { name: "kpi.alert.raised" });
   bus.subscribe("alert.acked", (event) => { void publishKpi(event.branchId); }, { name: "kpi.alert.acked" });
+  bus.subscribe("alert.resolved", (event) => { void publishKpi(event.branchId); }, { name: "kpi.alert.resolved" });
   bus.subscribe("device.status_changed", (event) => { void publishKpi(event.branchId); }, { name: "kpi.device" });
   telemetryPipeline.start();
 

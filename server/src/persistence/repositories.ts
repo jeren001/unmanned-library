@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { SqliteDatabase } from "./database.js";
 
 export type Query = { limit?: number; offset?: number; status?: string; branchId?: string; userId?: string; q?: string };
+export type AlertQuery = Query & { type?: string; severity?: string; from?: string; to?: string };
 
 const now = () => new Date().toISOString();
 const id = () => randomUUID();
@@ -10,7 +11,7 @@ export class LibraryRepository {
   constructor(private readonly db: SqliteDatabase) {}
 
   list(table: string, query: Query = {}) {
-    const allowed = new Set(["branches", "users", "books", "loans", "reservations", "devices", "alerts", "maintenance_records", "camera_clips", "rules", "notifications", "audit_log"]);
+    const allowed = new Set(["branches", "users", "books", "loans", "reservations", "devices", "alerts", "alert_notes", "maintenance_records", "camera_clips", "rules", "notifications", "audit_log"]);
     if (!allowed.has(table)) throw new Error("Unsupported table");
     const where: string[] = [];
     const params: Record<string, unknown> = {};
@@ -118,6 +119,61 @@ export class LibraryRepository {
       WHERE status = 'open' AND created_at >= ? AND message LIKE ?
       ORDER BY created_at DESC LIMIT 1
     `).get(since, `%${dedupKey}%`) as Record<string, unknown> | undefined;
+  }
+  alertList(query: AlertQuery = {}) {
+    const where: string[] = [];
+    const params: Record<string, unknown> = {};
+    if (query.branchId) { where.push("alerts.branch_id = @branchId"); params.branchId = query.branchId; }
+    if (query.status) { where.push("alerts.status = @status"); params.status = query.status; }
+    if (query.type) { where.push("alerts.type = @type"); params.type = query.type; }
+    if (query.severity) { where.push("alerts.severity = @severity"); params.severity = query.severity; }
+    if (query.from) { where.push("alerts.created_at >= @from"); params.from = query.from; }
+    if (query.to) { where.push("alerts.created_at <= @to"); params.to = query.to; }
+    const limit = Math.min(Math.max(query.limit ?? 50, 1), 200);
+    const offset = Math.max(query.offset ?? 0, 0);
+    return this.db.prepare(`
+      SELECT alerts.*, devices.name AS device_name, branches.name_en AS branch_name
+      FROM alerts
+      LEFT JOIN devices ON devices.id = alerts.device_id
+      LEFT JOIN branches ON branches.id = alerts.branch_id
+      ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
+      ORDER BY alerts.created_at DESC LIMIT @limit OFFSET @offset
+    `).all({ ...params, limit, offset });
+  }
+  alertDetail(alertId: string) {
+    return this.db.prepare(`
+      SELECT alerts.*, devices.name AS device_name, branches.name_en AS branch_name, camera_clips.file_path AS related_clip_path
+      FROM alerts
+      LEFT JOIN devices ON devices.id = alerts.device_id
+      LEFT JOIN branches ON branches.id = alerts.branch_id
+      LEFT JOIN camera_clips ON camera_clips.id = alerts.related_clip_id
+      WHERE alerts.id = ?
+    `).get(alertId) as Record<string, unknown> | undefined;
+  }
+  alertTimeline(alertId: string) {
+    const alert = this.get("alerts", alertId) as Record<string, unknown> | undefined;
+    if (!alert) return [];
+    const events = [
+      { kind: "created", actor_id: null, message: alert.message, ts: alert.created_at },
+      ...(alert.acked_by ? [{ kind: "acked", actor_id: alert.acked_by, message: "Alert acknowledged", ts: alert.updated_at }] : []),
+      ...(alert.resolved_at ? [{ kind: "resolved", actor_id: null, message: "Alert resolved", ts: alert.resolved_at }] : [])
+    ];
+    const notes = this.db.prepare(`
+      SELECT 'note' AS kind, actor_id, note AS message, created_at AS ts
+      FROM alert_notes WHERE alert_id = ?
+    `).all(alertId) as Array<{ kind: string; actor_id: string | null; message: string; ts: string }>;
+    return [...events, ...notes].sort((left, right) => String(left.ts).localeCompare(String(right.ts)));
+  }
+  findRecentOpenAlert(input: { branchId: string; deviceId?: string | null; type: string; since: string }) {
+    return this.db.prepare(`
+      SELECT * FROM alerts
+      WHERE status = 'open'
+        AND branch_id = @branchId
+        AND type = @type
+        AND created_at >= @since
+        AND ((@deviceId IS NULL AND device_id IS NULL) OR device_id = @deviceId)
+      ORDER BY created_at DESC LIMIT 1
+    `).get({ ...input, deviceId: input.deviceId ?? null }) as Record<string, unknown> | undefined;
   }
   overview() {
     return {

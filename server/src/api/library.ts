@@ -17,6 +17,12 @@ const querySchema = z.object({
   userId: z.string().optional(),
   q: z.string().optional()
 });
+const alertQuerySchema = querySchema.extend({
+  type: z.enum(["smoke", "intrusion", "theft", "device_offline", "device_fault", "threshold", "network"]).optional(),
+  severity: z.enum(["info", "warning", "critical"]).optional(),
+  from: z.string().optional(),
+  to: z.string().optional()
+});
 
 const idSchema = z.object({ id: z.string().min(1) });
 const deviceKind = z.enum(["kiosk", "rfid_reader", "gate", "camera", "temp_humidity", "light", "smoke", "pir", "shelf"]);
@@ -45,6 +51,15 @@ function body<T extends z.ZodTypeAny>(schema: T, req: Request, res: Response) {
 
 function query(req: Request, res: Response) {
   const parsed = querySchema.safeParse(req.query);
+  if (!parsed.success) {
+    res.status(400).json({ code: "INVALID_QUERY", message: "Query parameters are invalid.", details: parsed.error.flatten() });
+    return undefined;
+  }
+  return parsed.data;
+}
+
+function alertQuery(req: Request, res: Response) {
+  const parsed = alertQuerySchema.safeParse(req.query);
   if (!parsed.success) {
     res.status(400).json({ code: "INVALID_QUERY", message: "Query parameters are invalid.", details: parsed.error.flatten() });
     return undefined;
@@ -242,7 +257,7 @@ export function createLibraryRouter(services: Services, options: LibraryRouterOp
   }));
 
   router.get("/alerts", manage, withHandler((req, res) => {
-    const parsed = query(req, res); if (!parsed) return;
+    const parsed = alertQuery(req, res); if (!parsed) return;
     res.json({ data: services.alerts.list(parsed) });
   }));
   router.post("/alerts", manage, withHandler((req, res) => {
@@ -260,8 +275,23 @@ export function createLibraryRouter(services: Services, options: LibraryRouterOp
     }), req, res); if (!value) return;
     res.status(201).json({ data: services.alerts.create(value) });
   }));
-  router.post("/alerts/:id/ack", manage, withHandler((req, res) => res.json({ data: services.alerts.ack(idSchema.parse(req.params).id, actor(req).id) })));
-  router.post("/alerts/:id/resolve", manage, withHandler((req, res) => res.json({ data: services.alerts.resolve(idSchema.parse(req.params).id) })));
+  router.post("/alerts/bulk-ack", manage, withHandler((req, res) => {
+    const value = body(z.object({ ids: z.array(z.string().min(1)).min(1).max(200), note: z.string().trim().min(1).optional() }), req, res); if (!value) return;
+    res.json({ data: services.alerts.bulkAck(value.ids, actor(req).id, value.note) });
+  }));
+  router.get("/alerts/:id", manage, withHandler((req, res) => res.json({ data: services.alerts.detail(idSchema.parse(req.params).id) })));
+  router.post("/alerts/:id/ack", manage, withHandler((req, res) => {
+    const value = body(z.object({ note: z.string().trim().min(1).optional() }).default({}), req, res); if (!value) return;
+    res.json({ data: services.alerts.ack(idSchema.parse(req.params).id, actor(req).id, value.note) });
+  }));
+  router.post("/alerts/:id/resolve", manage, withHandler((req, res) => {
+    const value = body(z.object({ note: z.string().trim().min(1).optional() }).default({}), req, res); if (!value) return;
+    res.json({ data: services.alerts.resolve(idSchema.parse(req.params).id, actor(req).id, value.note) });
+  }));
+  router.post("/alerts/:id/notes", manage, withHandler((req, res) => {
+    const value = body(z.object({ note: z.string().trim().min(1) }), req, res); if (!value) return;
+    res.status(201).json({ data: services.alerts.addNote(idSchema.parse(req.params).id, actor(req).id, value.note) });
+  }));
 
   router.get("/telemetry", manage, withHandler((req, res) => {
     const parsed = query(req, res); if (!parsed) return;

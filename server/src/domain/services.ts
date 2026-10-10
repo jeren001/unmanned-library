@@ -1,4 +1,4 @@
-import type { LibraryRepository, Query } from "../persistence/repositories.js";
+import type { AlertQuery, LibraryRepository, Query } from "../persistence/repositories.js";
 import { AuditService } from "./auditService.js";
 import { CirculationService } from "./circulationService.js";
 import { LoanPolicy } from "./loanPolicy.js";
@@ -139,6 +139,14 @@ export class MaintenanceService extends CrudService { constructor(repo: LibraryR
 
 export class AlertService extends CrudService {
   constructor(repo: LibraryRepository, private readonly bus?: EventBus) { super(repo, "alerts"); }
+  override list(query?: AlertQuery) {
+    return this.repo.alertList(query);
+  }
+  detail(id: string) {
+    const alert = this.repo.alertDetail(id);
+    if (!alert) throw new DomainError("ALERT_NOT_FOUND", "Alert not found");
+    return { ...alert, timeline: this.repo.alertTimeline(id) };
+  }
   override create(values: Record<string, unknown>) {
     const result = super.create(values);
     const row = result as Record<string, unknown>;
@@ -150,9 +158,12 @@ export class AlertService extends CrudService {
     });
     return result;
   }
-  ack(id: string, actorId: string) {
+  ack(id: string, actorId: string, note?: string) {
+    const existing = this.repo.get("alerts", id) as Record<string, unknown> | undefined;
+    if (!existing) throw new DomainError("ALERT_NOT_FOUND", "Alert not found");
     const result = this.repo.update("alerts", id, { status: "acked", acked_by: actorId });
     const row = result as Record<string, unknown>;
+    if (note) this.addNote(id, actorId, note, false);
     this.bus?.publishNoWait("alert.acked", {
       alertId: id, branchId: String(row.branch_id), deviceId: row.device_id as string | null,
       type: row.type as AlertType, severity: row.severity as AlertSeverity, message: String(row.message),
@@ -161,9 +172,43 @@ export class AlertService extends CrudService {
     });
     return result;
   }
-  resolve(id: string) {
+  bulkAck(ids: string[], actorId: string, note?: string) {
+    return ids.map((id) => this.ack(id, actorId, note));
+  }
+  resolve(id: string, actorId?: string, note?: string) {
+    const existing = this.repo.get("alerts", id) as Record<string, unknown> | undefined;
+    if (!existing) throw new DomainError("ALERT_NOT_FOUND", "Alert not found");
     const result = this.repo.update("alerts", id, { status: "resolved", resolved_at: new Date().toISOString() });
+    const row = result as Record<string, unknown>;
+    if (note) this.addNote(id, actorId ?? null, note, false);
+    this.bus?.publishNoWait("alert.resolved", {
+      alertId: id, branchId: String(row.branch_id), deviceId: row.device_id as string | null,
+      type: row.type as AlertType, severity: row.severity as AlertSeverity, message: String(row.message),
+      status: "resolved", relatedClipId: row.related_clip_id as string | null,
+      relatedLoanId: row.related_loan_id as string | null, ts: new Date().toISOString()
+    });
     return result;
+  }
+  addNote(id: string, actorId: string | null, note: string, publish = true) {
+    const alert = this.repo.get("alerts", id) as Record<string, unknown> | undefined;
+    if (!alert) throw new DomainError("ALERT_NOT_FOUND", "Alert not found");
+    const row = this.repo.insert("alert_notes", { alert_id: id, actor_id: actorId, note }) as Record<string, unknown>;
+    if (publish) {
+      this.bus?.publishNoWait("alert.noted", {
+        alertId: id,
+        branchId: String(alert.branch_id),
+        deviceId: alert.device_id as string | null,
+        type: alert.type as AlertType,
+        severity: alert.severity as AlertSeverity,
+        message: note,
+        status: alert.status as "open" | "acked" | "resolved",
+        relatedClipId: alert.related_clip_id as string | null,
+        relatedLoanId: alert.related_loan_id as string | null,
+        ts: String(row.created_at),
+        actorId
+      });
+    }
+    return row;
   }
 }
 

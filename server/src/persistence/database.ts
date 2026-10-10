@@ -150,6 +150,15 @@ CREATE TABLE IF NOT EXISTS alerts (
   updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS alert_notes (
+  id TEXT PRIMARY KEY,
+  alert_id TEXT NOT NULL REFERENCES alerts(id),
+  actor_id TEXT REFERENCES users(id),
+  note TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS maintenance_records (
   id TEXT PRIMARY KEY,
   branch_id TEXT NOT NULL REFERENCES branches(id),
@@ -233,6 +242,15 @@ CREATE TABLE IF NOT EXISTS notifications (
   message TEXT NOT NULL,
   status TEXT NOT NULL CHECK (status IN ('queued','sent','failed')),
   created_by TEXT REFERENCES users(id),
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS alert_notes (
+  id TEXT PRIMARY KEY,
+  alert_id TEXT NOT NULL REFERENCES alerts(id),
+  actor_id TEXT REFERENCES users(id),
+  note TEXT NOT NULL,
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
