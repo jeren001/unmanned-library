@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import type { DeviceStatus } from "../events/types.js";
 import type { DeviceAdapter, DeviceRecord, NormalizedGateEvent, NormalizedTelemetry } from "./types.js";
 import { parseConfig } from "./types.js";
 
@@ -8,7 +9,13 @@ abstract class BaseAdapter implements DeviceAdapter {
   constructor(protected readonly device: DeviceRecord) { this.config = parseConfig(device); }
   async connect() { this.connected = true; }
   abstract read(): Promise<NormalizedTelemetry | NormalizedGateEvent | Record<string, unknown> | null>;
-  async health() { return { status: this.connected ? "online" as const : "offline" as const, latencyMs: 1 }; }
+  async health() {
+    const configured = this.config.healthStatus;
+    const status: DeviceStatus = configured === "online" || configured === "offline" || configured === "fault"
+      ? configured
+      : this.connected ? "online" as const : "offline" as const;
+    return { status, latencyMs: Number(this.config.healthLatencyMs ?? 1), message: typeof this.config.healthMessage === "string" ? this.config.healthMessage : undefined };
+  }
   async command(command: string, payload: Record<string, unknown> = {}) { return { ok: true, command, payload, deviceId: this.device.id }; }
   protected telemetry(metric: string, value: number, unit?: string): NormalizedTelemetry {
     return { deviceId: this.device.id, branchId: this.device.branch_id, metric, value, unit, ts: new Date().toISOString(), source: this.device.vendor };

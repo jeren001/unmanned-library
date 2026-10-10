@@ -7,6 +7,7 @@ function fixture() {
   const db = createDatabase(":memory:");
   const repo = new LibraryRepository(db);
   repo.insert("branches", { id: "branch-1", code: "T1", name_zh: "测试馆", name_en: "Test Library", type: "campus", address: "Test", status: "active" });
+  repo.insert("users", { id: "admin-1", role: "admin", username: "admin", email: "admin@test", password_hash: "hash", display_name: "Admin", status: "active", locked_until: null });
   repo.insert("users", { id: "reader-1", role: "reader", username: "reader", email: "reader@test", password_hash: "hash", display_name: "Test Reader", student_no: "1", id_number_masked: "****", card_no: "CARD-1", qr_code: "QR-1", deposit_cents: 0, status: "active", locked_until: null });
   repo.insert("books", { id: "book-1", isbn: "978-1", title: "Test Book", author: "Test Author", category: "I247", branch_id: "branch-1", shelf_location: "A-01", edition: "1", purchased_at: "2026-01-01", rfid_tag: "RFID-1", status: "on_shelf", cover_color: "#1F4D3A" });
   repo.insert("devices", { id: "device-1", branch_id: "branch-1", kind: "kiosk", name: "Kiosk", vendor: "Mock", protocol: "mock", address: "mock://1", status: "online", last_seen_at: new Date().toISOString(), config_json: "{}" });
@@ -60,6 +61,70 @@ describe("TelemetryService", () => {
     expect(hourly.min).toBe(24);
     expect(hourly.max).toBe(999999);
     expect(repo.telemetry({ branchId: "branch-1", metric: "temperature" })).toHaveLength(2);
+    db.close();
+  });
+});
+
+describe("DeviceService", () => {
+  it("registers devices with wizard config and exposes status fields", () => {
+    const { db, services } = fixture();
+    const device = services.devices.register({
+      branch_id: "branch-1",
+      kind: "smoke",
+      name: "Smoke sensor",
+      vendor: "Mock",
+      protocol: "mock",
+      address: "mock://smoke",
+      config: {
+        samplingIntervalSeconds: 45,
+        thresholds: { smoke_ppm: { max: 8 } }
+      }
+    }) as unknown as { id: string; status: string; last_seen_at: string | null; config: { samplingIntervalSeconds: number; thresholds: { smoke_ppm: { max: number } } } };
+    expect(device.status).toBe("offline");
+    expect(device.last_seen_at).toBeNull();
+    expect(device.config.samplingIntervalSeconds).toBe(45);
+    expect(device.config.thresholds.smoke_ppm.max).toBe(8);
+    const listed = services.devices.list({ status: "offline" }) as unknown as Array<{ id: string; status: string; last_seen_at: string | null }>;
+    expect(listed.some((row) => row.id === device.id && row.status === "offline" && row.last_seen_at === null)).toBe(true);
+    db.close();
+  });
+
+  it("updates config and sends commands through the adapter", async () => {
+    const { db, repo, services } = fixture();
+    const configured = services.devices.updateConfig("device-1", {
+      samplingIntervalSeconds: 60,
+      thresholds: { heartbeat: { min: 1, max: 1 } }
+    }) as { config: { samplingIntervalSeconds: number } };
+    expect(configured.config.samplingIntervalSeconds).toBe(60);
+    const response = await services.devices.command("device-1", "ping", { nonce: "abc" }) as unknown as { result: { ok: boolean; command: string; payload: { nonce: string }; deviceId: string } };
+    expect(response.result).toMatchObject({ ok: true, command: "ping", payload: { nonce: "abc" }, deviceId: "device-1" });
+    const row = repo.get("devices", "device-1") as { status: string; last_seen_at: string | null };
+    expect(row.status).toBe("online");
+    expect(row.last_seen_at).toBeTruthy();
+    db.close();
+  });
+
+  it("auto-registers a fault alert and draft maintenance record after failed health check", async () => {
+    const { db, repo, services } = fixture();
+    services.devices.updateConfig("device-1", {
+      samplingIntervalSeconds: 30,
+      thresholds: {},
+      healthStatus: "fault",
+      healthMessage: "simulated adapter failure"
+    });
+    const result = await services.devices.healthCheck("device-1", "admin-1") as unknown as {
+      health: { status: string; message?: string };
+      alert: { id: string; type: string; status: string; device_id: string };
+      maintenance: { related_alert_id: string; finished_at: string | null; kind: string };
+      device: { status: string; last_seen_at: string | null };
+    };
+    expect(result.health).toMatchObject({ status: "fault", message: "simulated adapter failure" });
+    expect(result.device.status).toBe("fault");
+    expect(result.device.last_seen_at).toBeNull();
+    expect(result.alert).toMatchObject({ type: "device_fault", status: "open", device_id: "device-1" });
+    expect(result.maintenance).toMatchObject({ related_alert_id: result.alert.id, finished_at: null, kind: "device_repair" });
+    expect(repo.count("alerts", "device_id = @deviceId AND type = 'device_fault'", { deviceId: "device-1" })).toBe(1);
+    expect(repo.count("maintenance_records", "device_id = @deviceId AND finished_at IS NULL", { deviceId: "device-1" })).toBe(1);
     db.close();
   });
 });

@@ -5,6 +5,8 @@ import { LoanPolicy } from "./loanPolicy.js";
 import { asNumber, DomainError } from "./types.js";
 import type { EventBus } from "../events/bus.js";
 import type { AlertSeverity, AlertType } from "../events/types.js";
+import { DeviceAdapterFactory } from "../integration/factory.js";
+import type { DeviceAdapter } from "../integration/types.js";
 
 class CrudService {
   constructor(protected readonly repo: LibraryRepository, protected readonly table: string) {}
@@ -19,7 +21,88 @@ export class MemberService extends CrudService { constructor(repo: LibraryReposi
 export class BranchService extends CrudService { constructor(repo: LibraryRepository) { super(repo, "branches"); } }
 export class NotificationService extends CrudService { constructor(repo: LibraryRepository) { super(repo, "notifications"); } }
 export class DeviceService extends CrudService {
-  constructor(repo: LibraryRepository, private readonly bus?: EventBus) { super(repo, "devices"); }
+  private readonly adapters: DeviceAdapterFactory;
+  constructor(repo: LibraryRepository, private readonly bus?: EventBus, adapters = new DeviceAdapterFactory()) {
+    super(repo, "devices");
+    this.adapters = adapters;
+  }
+  override list(query?: Query) {
+    return super.list(query).map((row) => this.withConfig(row as Record<string, unknown>));
+  }
+  override get(id: string) {
+    return this.withConfig(super.get(id) as Record<string, unknown>);
+  }
+  register(input: Record<string, unknown>) {
+    const { config, ...values } = input;
+    const row = this.repo.insert("devices", {
+      ...values,
+      status: input.status ?? "offline",
+      config_json: JSON.stringify(config ?? {})
+    });
+    return this.withConfig(row as Record<string, unknown>);
+  }
+  updateConfig(id: string, config: Record<string, unknown>) {
+    const row = this.repo.update("devices", id, { config_json: JSON.stringify(config) });
+    if (!row) throw new DomainError("DEVICE_NOT_FOUND", "Device not found");
+    return this.withConfig(row as Record<string, unknown>);
+  }
+  async command(id: string, command: string, payload: Record<string, unknown> = {}) {
+    const row = this.repo.get("devices", id) as Record<string, unknown> | undefined;
+    if (!row) throw new DomainError("DEVICE_NOT_FOUND", "Device not found");
+    const adapter = this.adapter(row);
+    await adapter.connect();
+    const result = await adapter.command(command, payload);
+    this.repo.update("devices", id, { last_seen_at: new Date().toISOString(), status: result.ok === false ? "fault" : "online" });
+    return { device: this.withConfig(this.repo.get("devices", id) as Record<string, unknown>), result };
+  }
+  async healthCheck(id: string, actorId: string) {
+    const row = this.repo.get("devices", id) as Record<string, unknown> | undefined;
+    if (!row) throw new DomainError("DEVICE_NOT_FOUND", "Device not found");
+    const adapter = this.adapter(row);
+    await adapter.connect();
+    const health = await adapter.health();
+    const checkedAt = new Date().toISOString();
+    this.repo.update("devices", id, {
+      status: health.status === "online" ? "online" : "fault",
+      last_seen_at: health.status === "online" ? checkedAt : null
+    });
+    if (health.status !== "online") {
+      const alert = this.repo.insert("alerts", {
+        branch_id: String(row.branch_id),
+        device_id: id,
+        type: "device_fault",
+        severity: "warning",
+        message: `Adapter health check failed: ${health.message ?? health.status}`,
+        status: "open",
+        related_loan_id: null,
+        related_clip_id: null
+      }) as Record<string, unknown>;
+      this.bus?.publishNoWait("alert.raised", {
+        alertId: String(alert.id),
+        branchId: String(row.branch_id),
+        deviceId: id,
+        type: "device_fault",
+        severity: "warning",
+        message: String(alert.message),
+        status: "open",
+        relatedClipId: null,
+        relatedLoanId: null,
+        ts: checkedAt
+      });
+      const maintenance = this.repo.insert("maintenance_records", {
+        branch_id: String(row.branch_id),
+        device_id: id,
+        kind: "device_repair",
+        description: `Draft maintenance record: adapter health check failed (${health.status}).`,
+        started_at: checkedAt,
+        finished_at: null,
+        operator_id: actorId,
+        related_alert_id: String(alert.id)
+      }) as Record<string, unknown>;
+      return { health, device: this.withConfig(this.repo.get("devices", id) as Record<string, unknown>), alert, maintenance };
+    }
+    return { health, device: this.withConfig(this.repo.get("devices", id) as Record<string, unknown>) };
+  }
   override update(id: string, values: Record<string, unknown>) {
     const before = this.repo.get("devices", id) as Record<string, unknown> | undefined;
     const result = super.update(id, values);
@@ -38,6 +121,18 @@ export class DeviceService extends CrudService {
       });
     }
     return result;
+  }
+  private adapter(row: Record<string, unknown>): DeviceAdapter {
+    return this.adapters.create(row as never);
+  }
+  private withConfig(row: Record<string, unknown>) {
+    let config: Record<string, unknown> = {};
+    try {
+      config = typeof row.config_json === "string" ? JSON.parse(row.config_json) as Record<string, unknown> : {};
+    } catch {
+      config = {};
+    }
+    return { ...row, config };
   }
 }
 export class MaintenanceService extends CrudService { constructor(repo: LibraryRepository) { super(repo, "maintenance_records"); } }

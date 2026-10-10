@@ -19,6 +19,16 @@ const querySchema = z.object({
 });
 
 const idSchema = z.object({ id: z.string().min(1) });
+const deviceKind = z.enum(["kiosk", "rfid_reader", "gate", "camera", "temp_humidity", "light", "smoke", "pir", "shelf"]);
+const deviceProtocol = z.enum(["tcp", "http", "mock", "legacy"]);
+const thresholdSchema = z.record(z.string(), z.object({
+  min: z.number().finite().optional(),
+  max: z.number().finite().optional()
+}).refine((value) => value.min === undefined || value.max === undefined || value.min <= value.max, "min must be less than or equal to max"));
+const deviceConfigSchema = z.object({
+  samplingIntervalSeconds: z.number().int().min(1).max(86400),
+  thresholds: thresholdSchema
+}).strict();
 
 function actor(req: Request) {
   return (req as Request & { user?: { id: string; role: Role } }).user ?? { id: "system", role: "admin" as const };
@@ -63,6 +73,7 @@ function withHandler(handler: (req: Request, res: Response) => unknown) {
 export function createLibraryRouter(services: Services, options: LibraryRouterOptions = {}) {
   const router = Router();
   const manage = requireAuth("librarian", "admin");
+  const admin = requireAuth("admin");
   const operate = requireAuth("reader", "librarian", "admin");
 
   router.get("/books", operate, withHandler((req, res) => {
@@ -193,13 +204,41 @@ export function createLibraryRouter(services: Services, options: LibraryRouterOp
     const parsed = query(req, res); if (!parsed) return;
     res.json({ data: services.devices.list(parsed) });
   }));
-  router.post("/devices", manage, withHandler((req, res) => {
-    const value = body(z.object({ branch_id: z.string(), kind: z.string(), name: z.string(), vendor: z.string(), protocol: z.string(), address: z.string(), status: z.string().default("offline"), config_json: z.string().default("{}") }), req, res); if (!value) return;
-    res.status(201).json({ data: services.devices.create(value) });
+  router.post("/devices", admin, withHandler((req, res) => {
+    const value = body(z.object({
+      kind: deviceKind,
+      protocol: deviceProtocol,
+      address: z.string().trim().min(1),
+      branch_id: z.string().trim().min(1),
+      name: z.string().trim().min(1),
+      vendor: z.string().trim().min(1),
+      thresholds: thresholdSchema.default({}),
+      samplingIntervalSeconds: z.number().int().min(1).max(86400).default(30)
+    }), req, res); if (!value) return;
+    res.status(201).json({ data: services.devices.register({
+      branch_id: value.branch_id,
+      kind: value.kind,
+      name: value.name,
+      vendor: value.vendor,
+      protocol: value.protocol,
+      address: value.address,
+      status: "offline",
+      config: { samplingIntervalSeconds: value.samplingIntervalSeconds, thresholds: value.thresholds }
+    }) });
   }));
-  router.patch("/devices/:id", manage, withHandler((req, res) => {
-    const value = body(z.record(z.string(), z.unknown()), req, res); if (!value) return;
-    res.json({ data: services.devices.update(idSchema.parse(req.params).id, value) });
+  router.patch("/devices/:id/config", admin, withHandler((req, res) => {
+    const value = body(deviceConfigSchema, req, res); if (!value) return;
+    res.json({ data: services.devices.updateConfig(idSchema.parse(req.params).id, value) });
+  }));
+  router.post("/devices/:id/test-command", admin, withHandler(async (req, res) => {
+    const value = body(z.object({
+      command: z.string().trim().min(1),
+      payload: z.record(z.string(), z.unknown()).default({})
+    }), req, res); if (!value) return;
+    res.json({ data: await services.devices.command(idSchema.parse(req.params).id, value.command, value.payload) });
+  }));
+  router.post("/devices/:id/health-check", admin, withHandler(async (req, res) => {
+    res.json({ data: await services.devices.healthCheck(idSchema.parse(req.params).id, actor(req).id) });
   }));
 
   router.get("/alerts", manage, withHandler((req, res) => {
