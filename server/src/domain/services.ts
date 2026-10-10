@@ -1,4 +1,4 @@
-import type { AlertQuery, LibraryRepository, Query } from "../persistence/repositories.js";
+import type { AlertQuery, LibraryRepository, MaintenanceQuery, Query } from "../persistence/repositories.js";
 import { AuditService } from "./auditService.js";
 import { CirculationService } from "./circulationService.js";
 import { LoanPolicy } from "./loanPolicy.js";
@@ -135,7 +135,37 @@ export class DeviceService extends CrudService {
     return { ...row, config };
   }
 }
-export class MaintenanceService extends CrudService { constructor(repo: LibraryRepository) { super(repo, "maintenance_records"); } }
+export class MaintenanceService extends CrudService {
+  constructor(repo: LibraryRepository) { super(repo, "maintenance_records"); }
+  override list(query?: MaintenanceQuery) {
+    return this.repo.maintenanceList(query);
+  }
+  override create(values: Record<string, unknown>) {
+    const row = this.repo.insert("maintenance_records", values);
+    return this.withStatus(row as Record<string, unknown>);
+  }
+  override update(id: string, values: Record<string, unknown>) {
+    const existing = this.repo.get("maintenance_records", id) as Record<string, unknown> | undefined;
+    if (!existing) throw new DomainError("MAINTENANCE_NOT_FOUND", "Maintenance record not found");
+    const row = this.repo.update("maintenance_records", id, values);
+    return this.withStatus(row as Record<string, unknown>);
+  }
+  complete(id: string, values: { finished_at?: string; operator_id?: string | null; description?: string; related_alert_id?: string | null }) {
+    const existing = this.repo.get("maintenance_records", id) as Record<string, unknown> | undefined;
+    if (!existing) throw new DomainError("MAINTENANCE_NOT_FOUND", "Maintenance record not found");
+    const update: Record<string, unknown> = { finished_at: values.finished_at ?? new Date().toISOString() };
+    if (values.operator_id !== undefined) update.operator_id = values.operator_id;
+    if (values.description !== undefined) update.description = values.description;
+    if (values.related_alert_id !== undefined) update.related_alert_id = values.related_alert_id;
+    return this.withStatus(this.repo.update("maintenance_records", id, update) as Record<string, unknown>);
+  }
+  timeline(days = 30, query: Pick<MaintenanceQuery, "branchId" | "deviceId"> = {}) {
+    return this.repo.maintenanceTimeline(days, query);
+  }
+  private withStatus(row: Record<string, unknown>) {
+    return { ...row, status: row.finished_at ? "completed" : "open" };
+  }
+}
 
 export class AlertService extends CrudService {
   constructor(repo: LibraryRepository, private readonly bus?: EventBus) { super(repo, "alerts"); }

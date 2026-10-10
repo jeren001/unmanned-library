@@ -3,6 +3,7 @@ import type { SqliteDatabase } from "./database.js";
 
 export type Query = { limit?: number; offset?: number; status?: string; branchId?: string; userId?: string; q?: string };
 export type AlertQuery = Query & { type?: string; severity?: string; from?: string; to?: string };
+export type MaintenanceQuery = Query & { deviceId?: string; alertId?: string; kind?: string; from?: string; to?: string };
 
 const now = () => new Date().toISOString();
 const id = () => randomUUID();
@@ -174,6 +175,39 @@ export class LibraryRepository {
         AND ((@deviceId IS NULL AND device_id IS NULL) OR device_id = @deviceId)
       ORDER BY created_at DESC LIMIT 1
     `).get({ ...input, deviceId: input.deviceId ?? null }) as Record<string, unknown> | undefined;
+  }
+  maintenanceList(query: MaintenanceQuery = {}) {
+    const where: string[] = [];
+    const params: Record<string, unknown> = {};
+    if (query.branchId) { where.push("maintenance_records.branch_id = @branchId"); params.branchId = query.branchId; }
+    if (query.deviceId) { where.push("maintenance_records.device_id = @deviceId"); params.deviceId = query.deviceId; }
+    if (query.alertId) { where.push("maintenance_records.related_alert_id = @alertId"); params.alertId = query.alertId; }
+    if (query.kind) { where.push("maintenance_records.kind = @kind"); params.kind = query.kind; }
+    if (query.status === "open") where.push("maintenance_records.finished_at IS NULL");
+    if (query.status === "completed") where.push("maintenance_records.finished_at IS NOT NULL");
+    if (query.from) { where.push("COALESCE(maintenance_records.finished_at, maintenance_records.started_at) >= @from"); params.from = query.from; }
+    if (query.to) { where.push("maintenance_records.started_at <= @to"); params.to = query.to; }
+    const limit = Math.min(Math.max(query.limit ?? 50, 1), 200);
+    const offset = Math.max(query.offset ?? 0, 0);
+    return this.db.prepare(`
+      SELECT maintenance_records.*,
+        branches.name_en AS branch_name,
+        devices.name AS device_name,
+        alerts.type AS alert_type,
+        CASE WHEN maintenance_records.finished_at IS NULL THEN 'open' ELSE 'completed' END AS status
+      FROM maintenance_records
+      LEFT JOIN branches ON branches.id = maintenance_records.branch_id
+      LEFT JOIN devices ON devices.id = maintenance_records.device_id
+      LEFT JOIN alerts ON alerts.id = maintenance_records.related_alert_id
+      ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
+      ORDER BY maintenance_records.started_at DESC, maintenance_records.created_at DESC
+      LIMIT @limit OFFSET @offset
+    `).all({ ...params, limit, offset });
+  }
+  maintenanceTimeline(days = 30, query: Pick<MaintenanceQuery, "branchId" | "deviceId"> = {}) {
+    const safeDays = Math.min(Math.max(Math.trunc(days), 1), 365);
+    const from = new Date(Date.now() - safeDays * 24 * 60 * 60 * 1000).toISOString();
+    return this.maintenanceList({ ...query, from, limit: 200, offset: 0 });
   }
   overview() {
     return {

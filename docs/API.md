@@ -1166,7 +1166,7 @@ alerts for the same branch, device, and type are de-duplicated for
 ### `GET /api/maintenance`
 
 - **Role:** manage
-- **Request:** `GET /api/maintenance?branchId=branch-east&limit=20&offset=0`
+- **Request:** `GET /api/maintenance?branchId=branch-east&deviceId=device-east-1&alertId=alert-001&kind=device_repair&status=open&from=2026-10-01T00:00:00.000Z&to=2026-10-31T23:59:59.999Z&limit=20&offset=0`
 - **Response:**
 
 ```json
@@ -1181,7 +1181,11 @@ alerts for the same branch, device, and type are de-duplicated for
       "started_at": "2026-10-09T09:00:00.000Z",
       "finished_at": null,
       "operator_id": "librarian-001",
-      "related_alert_id": "alert-001"
+      "related_alert_id": "alert-001",
+      "status": "open",
+      "branch_name": "East Campus Library",
+      "device_name": "East Campus Library kiosk 1",
+      "alert_type": "device_fault"
     }
   ]
 }
@@ -1189,6 +1193,42 @@ alerts for the same branch, device, and type are de-duplicated for
 
 - **Errors:** `400 INVALID_QUERY`, `401`, `403`, `500 INTERNAL_ERROR`
 - **Status:** implemented
+
+Filters: `branchId`, `deviceId`, `alertId`, `kind`, `status`, `from`, `to`,
+`limit`, and `offset`. `kind` is one of `device_repair`, `inventory`,
+`book_mending`, or `restock`. `status` is derived from `finished_at`: `open`
+when null and `completed` when set.
+
+### `GET /api/maintenance/timeline`
+
+- **Role:** manage
+- **Request:** `GET /api/maintenance/timeline?days=30&branchId=branch-east&deviceId=device-east-1`
+- **Response:**
+
+```json
+{
+  "data": [
+    {
+      "id": "maint-001",
+      "branch_id": "branch-east",
+      "device_id": "device-east-1",
+      "kind": "device_repair",
+      "description": "Replace RFID reader cable.",
+      "started_at": "2026-10-09T09:00:00.000Z",
+      "finished_at": "2026-10-10T10:00:00.000Z",
+      "operator_id": "librarian-001",
+      "related_alert_id": "alert-001",
+      "status": "completed"
+    }
+  ]
+}
+```
+
+- **Errors:** `400 INVALID_QUERY`, `401`, `403`, `500 INTERNAL_ERROR`
+- **Status:** implemented
+
+The timeline defaults to the last 30 days and accepts `days` from `1` through
+`365`.
 
 ### `POST /api/maintenance`
 
@@ -1217,13 +1257,88 @@ alerts for the same branch, device, and type are de-duplicated for
     "branch_id": "branch-east",
     "device_id": "device-east-1",
     "kind": "device_repair",
-    "description": "Replace RFID reader cable."
+    "description": "Replace RFID reader cable.",
+    "started_at": "2026-10-10T10:00:00.000Z",
+    "finished_at": null,
+    "operator_id": "librarian-001",
+    "related_alert_id": "alert-001",
+    "status": "open"
   }
 }
 ```
 
 - **Errors:** `400 INVALID_INPUT`, `401`, `403`, `409 CONFLICT`, `500 INTERNAL_ERROR`
 - **Status:** implemented
+
+Creates an audit-log entry with action `create_maintenance`.
+
+### `PATCH /api/maintenance/:id`
+
+- **Role:** manage
+- **Request:**
+
+```json
+{
+  "kind": "device_repair",
+  "description": "Replace RFID reader cable and verify antenna.",
+  "started_at": "2026-10-10T10:00:00.000Z",
+  "operator_id": "librarian-001",
+  "related_alert_id": "alert-001"
+}
+```
+
+- **Response:**
+
+```json
+{
+  "data": {
+    "id": "maint-001",
+    "kind": "device_repair",
+    "description": "Replace RFID reader cable and verify antenna.",
+    "finished_at": null,
+    "status": "open"
+  }
+}
+```
+
+- **Errors:** `400 INVALID_INPUT`, `401`, `403`, `404 MAINTENANCE_NOT_FOUND`, `500 INTERNAL_ERROR`
+- **Status:** implemented
+
+Creates an audit-log entry with action `update_maintenance`.
+
+### `POST /api/maintenance/:id/complete`
+
+- **Role:** manage
+- **Request:**
+
+```json
+{
+  "finished_at": "2026-10-10T11:00:00.000Z",
+  "operator_id": "librarian-001",
+  "description": "Repair complete; RFID reader test passed.",
+  "related_alert_id": "alert-001"
+}
+```
+
+- **Response:**
+
+```json
+{
+  "data": {
+    "id": "maint-001",
+    "finished_at": "2026-10-10T11:00:00.000Z",
+    "operator_id": "librarian-001",
+    "description": "Repair complete; RFID reader test passed.",
+    "status": "completed"
+  }
+}
+```
+
+- **Errors:** `400 INVALID_INPUT`, `401`, `403`, `404 MAINTENANCE_NOT_FOUND`, `500 INTERNAL_ERROR`
+- **Status:** implemented
+
+Creates an audit-log entry with action `complete_maintenance`. If
+`finished_at` is omitted, the server uses the current timestamp.
 
 ### `GET /api/rules`
 

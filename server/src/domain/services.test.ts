@@ -128,3 +128,47 @@ describe("DeviceService", () => {
     db.close();
   });
 });
+
+describe("MaintenanceService", () => {
+  it("creates, updates, completes, filters, and exposes a 30-day timeline", () => {
+    const { db, repo, services } = fixture();
+    const alert = services.alerts.create({
+      branch_id: "branch-1",
+      device_id: "device-1",
+      type: "device_fault",
+      severity: "warning",
+      message: "Device needs repair",
+      status: "open",
+      related_loan_id: null,
+      related_clip_id: null
+    }) as { id: string };
+    const created = services.maintenance.create({
+      branch_id: "branch-1",
+      device_id: "device-1",
+      kind: "device_repair",
+      description: "Inspect kiosk",
+      started_at: new Date().toISOString(),
+      finished_at: null,
+      operator_id: "admin-1",
+      related_alert_id: alert.id
+    }) as { id: string; status: string };
+    services.audit.log("admin-1", "create_maintenance", "maintenance", created.id, { kind: "device_repair" });
+    expect(created.status).toBe("open");
+
+    const updated = services.maintenance.update(created.id, { description: "Inspect kiosk RFID reader", kind: "device_repair" }) as { description: string; status: string };
+    services.audit.log("admin-1", "update_maintenance", "maintenance", created.id, { description: updated.description });
+    expect(updated).toMatchObject({ description: "Inspect kiosk RFID reader", status: "open" });
+
+    const completed = services.maintenance.complete(created.id, { operator_id: "admin-1" }) as { status: string; finished_at: string };
+    services.audit.log("admin-1", "complete_maintenance", "maintenance", created.id, { finished_at: completed.finished_at });
+    expect(completed.status).toBe("completed");
+    expect(completed.finished_at).toBeTruthy();
+
+    const filtered = services.maintenance.list({ branchId: "branch-1", deviceId: "device-1", alertId: alert.id, kind: "device_repair", status: "completed" }) as Array<{ id: string }>;
+    expect(filtered.map((row) => row.id)).toContain(created.id);
+    const timeline = services.maintenance.timeline(30, { branchId: "branch-1" }) as Array<{ id: string; status: string }>;
+    expect(timeline).toEqual(expect.arrayContaining([expect.objectContaining({ id: created.id, status: "completed" })]));
+    expect(repo.count("audit_log", "entity = 'maintenance' AND entity_id = @id", { id: created.id })).toBe(3);
+    db.close();
+  });
+});

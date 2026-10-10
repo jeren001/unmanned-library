@@ -23,6 +23,15 @@ const alertQuerySchema = querySchema.extend({
   from: z.string().optional(),
   to: z.string().optional()
 });
+const maintenanceKind = z.enum(["device_repair", "inventory", "book_mending", "restock"]);
+const maintenanceQuerySchema = querySchema.extend({
+  deviceId: z.string().optional(),
+  alertId: z.string().optional(),
+  kind: maintenanceKind.optional(),
+  status: z.enum(["open", "completed"]).optional(),
+  from: z.string().optional(),
+  to: z.string().optional()
+});
 
 const idSchema = z.object({ id: z.string().min(1) });
 const deviceKind = z.enum(["kiosk", "rfid_reader", "gate", "camera", "temp_humidity", "light", "smoke", "pir", "shelf"]);
@@ -60,6 +69,15 @@ function query(req: Request, res: Response) {
 
 function alertQuery(req: Request, res: Response) {
   const parsed = alertQuerySchema.safeParse(req.query);
+  if (!parsed.success) {
+    res.status(400).json({ code: "INVALID_QUERY", message: "Query parameters are invalid.", details: parsed.error.flatten() });
+    return undefined;
+  }
+  return parsed.data;
+}
+
+function maintenanceQuery(req: Request, res: Response) {
+  const parsed = maintenanceQuerySchema.safeParse(req.query);
   if (!parsed.success) {
     res.status(400).json({ code: "INVALID_QUERY", message: "Query parameters are invalid.", details: parsed.error.flatten() });
     return undefined;
@@ -308,13 +326,64 @@ export function createLibraryRouter(services: Services, options: LibraryRouterOp
     res.status(201).json({ data: services.telemetry.ingest(value) });
   }));
 
+  router.get("/maintenance/timeline", manage, withHandler((req, res) => {
+    const parsed = z.object({
+      days: z.coerce.number().int().min(1).max(365).default(30),
+      branchId: z.string().optional(),
+      deviceId: z.string().optional()
+    }).safeParse(req.query);
+    if (!parsed.success) {
+      res.status(400).json({ code: "INVALID_QUERY", message: "Query parameters are invalid.", details: parsed.error.flatten() });
+      return;
+    }
+    res.json({ data: services.maintenance.timeline(parsed.data.days, { branchId: parsed.data.branchId, deviceId: parsed.data.deviceId }) });
+  }));
   router.get("/maintenance", manage, withHandler((req, res) => {
-    const parsed = query(req, res); if (!parsed) return;
+    const parsed = maintenanceQuery(req, res); if (!parsed) return;
     res.json({ data: services.maintenance.list(parsed) });
   }));
   router.post("/maintenance", manage, withHandler((req, res) => {
-    const value = body(z.object({ branch_id: z.string(), device_id: z.string().nullable().optional(), kind: z.string(), description: z.string(), started_at: z.string(), finished_at: z.string().nullable().optional(), operator_id: z.string().nullable().optional(), related_alert_id: z.string().nullable().optional() }), req, res); if (!value) return;
-    res.status(201).json({ data: services.maintenance.create(value) });
+    const value = body(z.object({
+      branch_id: z.string(),
+      device_id: z.string().nullable().optional(),
+      kind: maintenanceKind,
+      description: z.string().trim().min(1),
+      started_at: z.string(),
+      finished_at: z.string().nullable().optional(),
+      operator_id: z.string().nullable().optional(),
+      related_alert_id: z.string().nullable().optional()
+    }), req, res); if (!value) return;
+    const data = services.maintenance.create(value);
+    services.audit.log(actor(req).id, "create_maintenance", "maintenance", String((data as unknown as { id: string }).id), value, req.ip);
+    res.status(201).json({ data });
+  }));
+  router.patch("/maintenance/:id", manage, withHandler((req, res) => {
+    const value = body(z.object({
+      branch_id: z.string().optional(),
+      device_id: z.string().nullable().optional(),
+      kind: maintenanceKind.optional(),
+      description: z.string().trim().min(1).optional(),
+      started_at: z.string().optional(),
+      finished_at: z.string().nullable().optional(),
+      operator_id: z.string().nullable().optional(),
+      related_alert_id: z.string().nullable().optional()
+    }).strict(), req, res); if (!value) return;
+    const id = idSchema.parse(req.params).id;
+    const data = services.maintenance.update(id, value);
+    services.audit.log(actor(req).id, "update_maintenance", "maintenance", id, value, req.ip);
+    res.json({ data });
+  }));
+  router.post("/maintenance/:id/complete", manage, withHandler((req, res) => {
+    const value = body(z.object({
+      finished_at: z.string().optional(),
+      operator_id: z.string().nullable().optional(),
+      description: z.string().trim().min(1).optional(),
+      related_alert_id: z.string().nullable().optional()
+    }).default({}), req, res); if (!value) return;
+    const id = idSchema.parse(req.params).id;
+    const data = services.maintenance.complete(id, value);
+    services.audit.log(actor(req).id, "complete_maintenance", "maintenance", id, value, req.ip);
+    res.json({ data });
   }));
 
   router.get("/rules", operate, withHandler((_req, res) => res.json({ data: services.rules.list(), lastChanged: services.rules.latestAudit() ?? null })));
