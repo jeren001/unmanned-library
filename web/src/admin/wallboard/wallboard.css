@@ -452,7 +452,7 @@
 }
 
 .wb-alert.is-warning .wb-alert-sev { color: var(--warn); }
-.wb-alert.is-critical .wb-alert-sev { color: var(--rose); }
+.wb-alert.is-critical .wb-alert-sev { color: var(--blush); }
 
 .wb-alert b {
   display: block;

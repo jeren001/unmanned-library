@@ -60,6 +60,8 @@
 .admin-sidebar nav {
   display: grid;
   gap: 6px;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .admin-app .admin-drawer-link {
@@ -366,7 +368,7 @@
 
 .admin-page-heading p {
   margin: 0 0 4px;
-  color: var(--wood);
+  color: var(--warn);
   font: 11px var(--font-mono);
   letter-spacing: .12em;
 }
@@ -716,7 +718,6 @@
 
 .admin-rule-edit input:focus {
   border-color: var(--accent);
-  outline: none;
 }
 
 .admin-rule-edit input[aria-invalid="true"] {
@@ -781,7 +782,7 @@
 
 .admin-palette-group {
   margin: 8px 8px 4px;
-  color: var(--wood);
+  color: var(--warn);
   font: 11px var(--font-mono);
   letter-spacing: .1em;
   text-transform: uppercase;

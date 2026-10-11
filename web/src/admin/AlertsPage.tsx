@@ -242,7 +242,7 @@ function AlertDetail({ alert, device, branch, busy, onAct }: { alert: AlertFull;
  * Camera clip player. Plays the real recording when the API gives a URL; otherwise shows a
  * clearly labelled simulated feed for the clip's time window, with the same controls.
  */
-function ClipPlayer({ alert, device }: { alert: AlertFull; device?: DeviceRow }) {
+export function ClipPlayer({ alert, device }: { alert: AlertFull; device?: DeviceRow }) {
   const { t } = useTranslation();
   const [clip, setClip] = useState<{ status: "loading" | "ready" | "error"; data?: ClipRow; error?: unknown }>({ status: "loading" });
   const [nonce, setNonce] = useState(0);

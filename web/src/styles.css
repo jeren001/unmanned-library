@@ -17,7 +17,7 @@
   --paper: #FFFBF3;
   --ink: #231815;
   --line: #E6D6BE;
-  --success: #2E7D5B;
+  --success: #276E50; /* darkened from #2E7D5B for 4.5:1 text contrast on cream */
 
   --bg: var(--cream);
   --surface: var(--paper);
@@ -30,7 +30,7 @@
   --accent-ink: var(--cream);
   --accent-soft: color-mix(in srgb, var(--blush) 22%, transparent);
   --focus: var(--rose);
-  --warn: var(--wood);
+  --warn: var(--wood-deep);
   --danger: #B02239;
   --info: #7A4E63;
 
@@ -38,7 +38,7 @@
   --status-in-bg: #DDEFE5;
   --status-in-fg: var(--success);
   --status-borrowed-bg: #F6E3D3;
-  --status-borrowed-fg: var(--wood);
+  --status-borrowed-fg: var(--wood-deep);
   --status-overdue-bg: #F4D6D9;
   --status-overdue-fg: var(--burgundy);
   --status-repair-bg: #EFE7DA;
@@ -159,16 +159,15 @@ textarea {
   font: inherit;
 }
 
-button,
-a,
-input,
-select,
-textarea,
-[tabindex]:not([tabindex="-1"]) {
+/* Pointer focus stays quiet; keyboard focus always gets the ring (the old element list
+   had higher specificity than :focus-visible and hid it on [tabindex] tabs and rows). */
+:focus:not(:focus-visible) {
   outline: none;
 }
 
-:focus-visible {
+:focus-visible,
+/* Tabbing through a date input moves focus into its inner (shadow) segments, where neither :focus nor :focus-visible matches the input. */
+input:is([type="date"], [type="datetime-local"], [type="time"]):focus-within {
   outline: 3px solid var(--focus);
   outline-offset: 2px;
 }

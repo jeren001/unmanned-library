@@ -18,7 +18,7 @@ Tokens are implemented as CSS variables in `/web/src/styles.css` and exposed to 
 | Accent | forest `#1F4D3A` | `#6FB38F` |
 | Accent ink | `#F4F0E7` | `#0F1714` |
 | Brass | `#B07A1E` | `#D9A441` |
-| Status | ok `#2E7D5B`, warn `#B7791F`, danger `#B3372B`, info `#2F5D8A` | ok `#5FBF8F`, warn `#E0A640`, danger `#E5675A`, info `#7EA8D6` |
+| Status | ok `#276E50`, warn `#B7791F`, danger `#B3372B`, info `#2F5D8A` | ok `#5FBF8F`, warn `#E0A640`, danger `#E5675A`, info `#7EA8D6` |
 
 Typography is self-hosted through `@fontsource`: display uses Fraunces with Noto Serif SC; UI uses Inter with Noto Sans SC; data and call numbers use JetBrains Mono. The scale is 12, 14, 16, 20, 28, 40, and 64. Tables and dashboard numbers use tabular numerals.
 

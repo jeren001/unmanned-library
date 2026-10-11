@@ -64,16 +64,26 @@
   opacity: 1;
 }
 
+/* A transparent layer spanning the scan area; its top edge carries the line. Moving the
+   layer with transform keeps the sweep on the compositor (animating `top` re-laid out the tray). */
 .kiosk-borrow-scanline {
   position: absolute;
   z-index: 2;
   left: 0;
   right: 0;
   top: 4%;
+  height: 90%;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.kiosk-borrow-scanline::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
   height: 3px;
   background: var(--rose);
   box-shadow: 0 0 12px var(--rose);
-  opacity: 0;
 }
 
 .kiosk-borrow-tray.is-reading .kiosk-borrow-scanline {
@@ -82,8 +92,8 @@
 }
 
 @keyframes kiosk-borrow-scan {
-  from { top: 4%; }
-  to { top: 94%; }
+  from { transform: translateY(0); }
+  to { transform: translateY(100%); }
 }
 
 .kiosk-borrow-ring {
@@ -367,6 +377,17 @@
   font-size: 40px;
   line-height: 1;
   color: var(--accent);
+}
+
+@media (orientation: portrait) and (min-height: 1200px) {
+  .kiosk-borrow-tray {
+    grid-template-columns: 1fr;
+    gap: 28px;
+  }
+
+  .kiosk-borrow-tray-bed {
+    height: 460px;
+  }
 }
 
 @media (max-width: 760px) {

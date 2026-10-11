@@ -70,3 +70,54 @@ The frontend already reads `call_number` when present (`web/src/kiosk/kioskState
 
 - **Endpoint:** `GET /api/devices/:id`.
 - **Reason:** alerts and maintenance rows reference `device_id`; the frontend currently loads all devices (`limit=200`) to resolve names.
+
+## 10. Bucketed telemetry series — open (mocked)
+
+- **Endpoint:** `GET /api/telemetry/series?branchId=&metric=&from=&to=&bucket=<seconds>` (librarian/admin).
+- **Reason:** the Telemetry page draws an average line with a min–max band per bucket. `GET /api/telemetry` returns at most 1000 raw rows **oldest first**, and the simulator writes a sample every 5 s, so one query over 24 h only covers its first ~80 minutes. Until this route exists, `fetchTelemetrySeries` in `web/src/admin/insightApi.ts` splits the range into 24–30 windows, queries them in parallel and buckets in the browser; windows that hit the cap are reported on the page as partial. `telemetry_hourly` already holds most of what is needed.
+- **Shape:** buckets aggregate `quality = 'ok'` samples only; flagged samples are returned raw so the chart can draw them as hollow markers:
+
+```json
+{ "data": {
+  "buckets": [{ "ts": "2026-10-09T00:00:00.000Z", "avg": 22.4, "min": 20.1, "max": 25.0, "count": 360 }],
+  "flagged": [{ "id": "tel-…", "device_id": "device-east-5", "branch_id": "branch-east", "metric": "temperature", "value": 999999, "quality": "dirty", "ts": "2026-10-09T00:31:12Z" }],
+  "samples": 17280
+} }
+```
+
+## 11. Traceability chain — open (mocked)
+
+- **Endpoint:** `GET /api/trace?bookId=…[&loanId=…]` (librarian/admin); `loanId` defaults to the book's latest loan. A `GET /api/loans/:id` would also help the search box resolve loan IDs.
+- **Reason:** the Traceability page shows book → RFID tag → loan → device events → camera clip → alerts. Loans cannot be filtered by book or fetched by id, so the mock (`fetchTrace`) pages through all loans (≤ 25 × 200), then joins readers, devices, maintenance and alerts. Device events are only **derived** from loan timestamps; `gate_events` and the audit log are not served at all, and clips come only via `alerts.related_clip_id` (see #7).
+- **Shape:**
+
+```json
+{ "data": {
+  "book": { "id": "book-0010", "title": "…", "rfid_tag": "RFID-000010", "…": "…" },
+  "loans": [{ "id": "loan-00009", "borrowed_at": "…", "status": "returned", "device_id": "device-east-1", "…": "…" }],
+  "loan": { "id": "loan-00009", "…": "…" },
+  "reader": { "id": "reader-010", "display_name": "…", "card_no": "…" },
+  "device": { "id": "device-east-1", "name": "…", "kind": "kiosk", "…": "…" },
+  "deviceEvents": [
+    { "at": "…", "kind": "borrow", "deviceId": "device-east-1" },
+    { "at": "…", "kind": "gate_exit", "deviceId": "device-east-3", "detail": "authorized" },
+    { "at": "…", "kind": "return", "deviceId": "device-east-1" }
+  ],
+  "alerts": [{ "id": "alert-009", "related_loan_id": "loan-00009", "related_clip_id": "clip-009", "link": "loan", "…": "…" }]
+} }
+```
+
+`deviceEvents[].kind` today: `borrow`, `renew`, `return`, `overdue`, `lost`, `maintenance`; please add gate reads (`gate_exit` / `gate_entry`, from `gate_events` whose `rfid_tags_json` contains the tag) and renew/return device ids from the audit log. `alerts[].link` is `loan` (via `related_loan_id`) or `device` (same device during the loan).
+
+## 12. Export history (and optional server-side export) — open (mocked)
+
+- **Endpoints:** `GET /api/exports?limit=50` and `POST /api/exports` (librarian/admin). Optional: `GET /api/exports/:dataset.xlsx?branchId=&from=&to=&metric=`.
+- **Reason:** the Exports page builds the `.xlsx` in the browser from the list endpoints (≤ 10,000 rows, see `collectExport` in `web/src/admin/insightApi.ts` and `web/src/admin/xlsx.ts`). Its history is meant to be shared and audited, but without these routes it is kept in the browser's `localStorage` and labelled as such. Larger exports need the server-side export route.
+- **Shape:** `POST` body and `GET` rows:
+
+```json
+{ "dataset": "loans", "branchId": "branch-east", "from": "2026-09-01", "to": "2026-09-30", "metric": null,
+  "rows": 412, "filename": "ul_loans_EAST_2026-09-01_2026-09-30_20261010-0805.xlsx", "at": "2026-10-10T08:05:00Z", "by": "Admin" }
+```
+
+The server should fill `id`, `at` and `by` from the session and write an `audit_log` entry (`action: "export"`). `dataset` is one of `loans`, `books`, `readers`, `alerts`, `maintenance`, `devices`, `telemetry`.

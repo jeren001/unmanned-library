@@ -67,7 +67,7 @@ export function DevicesPage() {
         </div>
       ) : (
         <>
-          <StaggerList className="admin-device-grid" replayKey={list.rows} step={40}>
+          <StaggerList className="admin-device-grid" replayKey={list.rows.map((device) => device.id).join()} step={40}>
             {devices.map((device) => (
               <DeviceCard
                 key={device.id}

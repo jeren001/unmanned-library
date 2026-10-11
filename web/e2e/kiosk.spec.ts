@@ -15,7 +15,7 @@ async function login(page: Page) {
   await page.getByRole("button", { name: /请刷读者证|Tap your card/ }).click();
   await page.getByLabel("Reader card number").fill("20240001");
   await page.getByRole("button", { name: /继续|Continue/ }).click();
-  await expect(page.getByText("欢迎回来 / Welcome back")).toBeVisible();
+  await expect(page.getByRole("heading", { name: /欢迎回来/ })).toBeVisible();
 }
 
 test("borrow, renew, return and offline outbox sync", async ({ page }) => {

@@ -1,7 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Navigate, NavLink, Route, Routes, useLocation, useNavigate } from "react-router";
-import { Button, LangSwitch, SegmentedControl, StatusBadge, ToastProvider, useToast } from "../shared/components";
+import { Button, LangSwitch, SegmentedControl, Skeleton, StatusBadge, ToastProvider, useToast } from "../shared/components";
 import { BellIcon } from "../shared/icons";
 import { BookSpinesBand } from "../shared/motion";
 import { ApiError, fetchBranches, fetchMe, fetchOpenAlerts, logout, type AlertRow, type Branch, type Role, type SessionUser } from "./adminApi";
@@ -14,6 +14,8 @@ import { DevicesPage } from "./DevicesPage";
 import { MaintenancePage } from "./MaintenancePage";
 import { OverviewPage, RulesPage } from "./OverviewRules";
 import { SimulatorPage } from "./SimulatorPage";
+import { TracePage } from "./TracePage";
+import { ExportsPage } from "./ExportsPage";
 import "./admin.css";
 
 type Theme = "light" | "dark";
@@ -27,6 +29,9 @@ const NAV: NavItem[] = [
   { key: "devices", path: "devices", roles: ["librarian", "admin"], plate: "400" },
   { key: "alerts", path: "alerts", roles: ["librarian", "admin"], plate: "500" },
   { key: "maintenance", path: "maintenance", roles: ["librarian", "admin"], plate: "600" },
+  { key: "telemetry", path: "telemetry", roles: ["librarian", "admin"], plate: "700" },
+  { key: "trace", path: "trace", roles: ["librarian", "admin"], plate: "750" },
+  { key: "exports", path: "exports", roles: ["librarian", "admin"], plate: "800" },
   { key: "rules", path: "settings/rules", roles: ["admin"], plate: "900" },
   { key: "simulator", path: "settings/simulator", roles: ["admin"], plate: "950" }
 ];
@@ -35,6 +40,7 @@ const THEME_KEY = "ul-admin-theme";
 
 // Loaded on demand so ECharts is only downloaded for the wallboard.
 const WallboardPage = lazy(() => import("./wallboard/WallboardPage").then((module) => ({ default: module.WallboardPage })));
+const TelemetryPage = lazy(() => import("./TelemetryPage").then((module) => ({ default: module.TelemetryPage })));
 
 function readTheme(): Theme {
   try {
@@ -328,6 +334,9 @@ function AdminShell({ user }: { user: SessionUser }) {
             <Route path="devices" element={<DevicesPage />} />
             <Route path="alerts" element={<AlertsPage />} />
             <Route path="maintenance" element={<MaintenancePage />} />
+            <Route path="telemetry" element={<Suspense fallback={<div className="admin-telemetry-chart is-loading"><Skeleton lines={6} /></div>}><TelemetryPage /></Suspense>} />
+            <Route path="trace" element={<TracePage />} />
+            <Route path="exports" element={<ExportsPage />} />
             <Route path="settings/simulator" element={<RequireRole user={user} roles={["admin"]}><SimulatorPage /></RequireRole>} />
             <Route path="*" element={<Navigate to="/admin" replace />} />
           </Routes>

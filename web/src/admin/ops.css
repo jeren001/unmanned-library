@@ -115,7 +115,6 @@
 
 .admin-config textarea:focus {
   border-color: var(--accent);
-  outline: none;
 }
 
 .admin-config textarea[aria-invalid="true"] {
@@ -508,7 +507,6 @@
 .admin-form input:focus,
 .admin-form textarea:focus {
   border-color: var(--accent);
-  outline: none;
 }
 
 .admin-form [aria-invalid="true"] {

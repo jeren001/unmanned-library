@@ -139,7 +139,6 @@
 .qa-field input:focus,
 .qa-field select:focus {
   border-color: var(--accent);
-  outline: none;
 }
 
 .qa-field.is-mono input {
@@ -283,12 +282,24 @@
 .qa-badge-tone-offline { background: var(--status-repair-bg); color: var(--status-repair-fg); }
 .qa-badge-tone-info { background: color-mix(in srgb, var(--info) 14%, transparent); color: var(--info); }
 
+/* The halo is a static shadow on a pseudo-element; only its opacity animates (no repaint). */
 .qa-badge-overdue {
+  position: relative;
+}
+
+.qa-badge-overdue::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--status-overdue-fg) 18%, transparent);
+  opacity: 0;
+  pointer-events: none;
   animation: qa-pulse 1.8s ease-in-out infinite;
 }
 
 @keyframes qa-pulse {
-  50% { box-shadow: 0 0 0 5px color-mix(in srgb, var(--status-overdue-fg) 18%, transparent); }
+  50% { opacity: 1; }
 }
 
 /* ---------- Catalog card ---------- */
@@ -555,7 +566,8 @@
 
 .qa-toast-success {
   background: var(--success);
-  color: #FFFFFF;
+  /* cream on the light theme's deep green, near-black on the dark theme's mint */
+  color: var(--accent-ink);
 }
 
 .qa-toast > svg {
@@ -843,7 +855,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .qa-badge-overdue,
+  .qa-badge-overdue::after,
   .qa-skeleton span,
   .qa-spin {
     animation: none;

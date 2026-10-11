@@ -132,6 +132,8 @@ export function KioskPage() {
       if (idleSeconds >= 25 && idleSeconds < 30) setWarningSeconds(30 - idleSeconds);
       if (idleSeconds >= 30) {
         void logout().catch(() => undefined);
+        // Without this the "signing out" dialog stayed over the idle screen.
+        setWarningSeconds(null);
         dispatch({ type: "LOGOUT" });
       }
     }, 1000);
@@ -463,17 +465,17 @@ function HomeScreen({ user, openLoans, dueSoon, overdue, onNavigate }: { user: s
     { screen: "loans", zh: "我的借阅", en: "My loans", mark: "≡" },
     { screen: "help", zh: "帮助", en: "Help", mark: "?" }
   ];
-  return <KioskShell title={{ zh: "你好，", en: "Hello, " }} onBack={undefined}>
+  return <KioskShell title={{ zh: `你好，${user}`, en: `Hello, ${user}` }} onBack={undefined}>
     <div className="kiosk-home">
-      <div className="kiosk-greeting"><h1>{user}<small>欢迎回来 / Welcome back</small></h1><p>选择一项服务，整个过程不到 30 秒<br /><span>Choose a service. Most tasks take under 30 seconds.</span></p></div>
+      <div className="kiosk-greeting"><h1>欢迎回来<small>Welcome back</small></h1><p>选择一项服务，整个过程不到 30 秒<br /><span>Choose a service. Most tasks take under 30 seconds.</span></p></div>
       <div className="kiosk-summary"><div><strong>{openLoans}</strong><span>借阅中 / Active</span></div><div className={dueSoon ? "is-warn" : ""}><strong>{dueSoon}</strong><span>即将到期 / Due soon</span></div><div className={overdue ? "is-danger" : ""}><strong>{overdue}</strong><span>逾期 / Overdue</span></div></div>
-      <div className="kiosk-action-grid">{actions.map((action) => <button key={action.screen} onClick={() => onNavigate(action.screen)}><b>{action.mark}</b><span>{action.zh}</span><small>{action.en}</small></button>)}</div>
+      <div className="kiosk-action-grid">{actions.map((action) => <button key={action.screen} onClick={() => onNavigate(action.screen)}><b aria-hidden="true">{action.mark}</b><span>{action.zh}</span><small>{action.en}</small></button>)}</div>
     </div>
   </KioskShell>;
 }
 
 function KioskShell({ title, onBack, children }: { title: { zh: string; en: string }; onBack: (() => void) | undefined; children: ReactNode }) {
-  return <section className="kiosk-shell"><div className="kiosk-shell-heading">{onBack ? <button className="kiosk-back" onClick={onBack}>←</button> : null}<h1>{title.zh}<small>{title.en}</small></h1></div>{children}</section>;
+  return <section className="kiosk-shell"><div className="kiosk-shell-heading">{onBack ? <button className="kiosk-back" onClick={onBack} aria-label="返回 / Back"><span aria-hidden="true">←</span></button> : null}<h1>{title.zh}<small>{title.en}</small></h1></div>{children}</section>;
 }
 
 function BorrowScreen(props: Parameters<typeof BorrowFlow>[0]) {

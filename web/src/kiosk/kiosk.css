@@ -606,11 +606,23 @@
   border-radius: 50%;
   color: var(--wood);
   font: 15px var(--font-mono);
+  position: relative;
+}
+
+/* Static halo, opacity-only pulse: compositor work instead of a box-shadow repaint per frame. */
+.kiosk-tray-ring::after {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 13px color-mix(in srgb, var(--wood) 13%, transparent);
+  opacity: 0;
+  pointer-events: none;
   animation: kiosk-rfid-pulse 2.4s ease-out infinite;
 }
 
 @keyframes kiosk-rfid-pulse {
-  50% { box-shadow: 0 0 0 13px color-mix(in srgb, var(--wood) 13%, transparent); }
+  50% { opacity: 1; }
 }
 
 .kiosk-tray p {
@@ -1108,11 +1120,20 @@
   }
 }
 
+/* Portrait kiosk (1080x1920): content starts under the heading instead of floating mid-screen,
+   and the touch targets grow into the extra height. */
 @media (orientation: portrait) and (min-height: 1200px) {
   .kiosk-topbar { min-height: 108px; }
   .kiosk-shell { padding-top: 42px; }
-  .kiosk-home { gap: 36px; }
-  .kiosk-action-grid button { min-height: 194px; }
+  .kiosk-home { justify-content: flex-start; gap: 40px; padding-top: 36px; }
+  /* Idle: the shelf art becomes a top band and the copy gets the full width, so the title
+     stays on one line and the start button does not wrap. */
+  .kiosk-idle { grid-template-columns: 1fr; grid-template-rows: minmax(0, .9fr) minmax(0, 1.1fr); }
+  .kiosk-idle-art { order: -1; min-height: 0; }
+  .kiosk-idle-art .qa-spines { height: min(30vh, 520px); }
+  .kiosk-idle-copy { align-self: center; padding: 48px 72px; }
+  .kiosk-action-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .kiosk-action-grid button { min-height: 280px; }
   .kiosk-tray { min-height: 330px; }
 }
 

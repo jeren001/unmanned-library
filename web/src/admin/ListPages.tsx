@@ -15,13 +15,13 @@ type T = (key: string, options?: Record<string, unknown>) => string;
 const BOOK_STATUS: Record<BookRow["status"], BookStatus | null> = { on_shelf: "in", borrowed: "borrowed", repair: "repair", lost: null };
 const LOAN_STATUS: Record<LoanRow["status"], BookStatus | null> = { active: "borrowed", overdue: "overdue", returned: "in", lost: null };
 
-function BookBadge({ status }: { status: BookRow["status"] }) {
+export function BookBadge({ status }: { status: BookRow["status"] }) {
   const { t } = useTranslation();
   const mapped = BOOK_STATUS[status];
   return mapped ? <StatusBadge status={mapped} label={t(`admin.bookStatus.${status}`)} /> : <StatusBadge tone="danger" label={t("admin.bookStatus.lost")} />;
 }
 
-function LoanBadge({ status }: { status: LoanRow["status"] }) {
+export function LoanBadge({ status }: { status: LoanRow["status"] }) {
   const { t } = useTranslation();
   const mapped = LOAN_STATUS[status];
   return mapped ? <StatusBadge status={mapped} label={t(`admin.loanStatus.${status}`)} /> : <StatusBadge tone="danger" label={t("admin.loanStatus.lost")} />;

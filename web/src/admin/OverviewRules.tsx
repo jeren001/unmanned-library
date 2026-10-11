@@ -68,7 +68,7 @@ export function OverviewPage({ branchId, refreshKey }: { branchId: string; refre
         <section className="admin-panel">
           <h2>{t("admin.overview.alerts")}</h2>
           {alerts.status === "loading" ? <Skeleton lines={4} /> : alerts.status === "error" ? <ErrorPanel error={alerts.error} onRetry={alerts.reload} /> : alerts.data?.length ? (
-            <StaggerList as="ul" className="admin-feed" replayKey={alerts.data}>
+            <StaggerList as="ul" className="admin-feed" replayKey={alerts.data?.map((alert) => alert.id).join()}>
               {alerts.data.map((alert: AlertRow) => (
                 <li key={alert.id}>
                   <StatusBadge tone={SEVERITY_TONE[alert.severity] ?? "info"} label={t(`admin.severity.${alert.severity}`)} />
@@ -82,7 +82,7 @@ export function OverviewPage({ branchId, refreshKey }: { branchId: string; refre
         <section className="admin-panel">
           <h2>{t("admin.overview.loans")}</h2>
           {loans.status === "loading" ? <Skeleton lines={4} /> : loans.status === "error" ? <ErrorPanel error={loans.error} onRetry={loans.reload} /> : loans.data?.length ? (
-            <StaggerList as="ul" className="admin-feed" replayKey={loans.data}>
+            <StaggerList as="ul" className="admin-feed" replayKey={loans.data?.map((loan) => loan.id).join()}>
               {loans.data.map((loan) => (
                 <li key={loan.id}>
                   <StatusBadge status={loan.status === "overdue" ? "overdue" : loan.status === "returned" ? "in" : "borrowed"} label={t(`admin.loanStatus.${loan.status}`)} />
