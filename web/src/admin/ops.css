@@ -1,0 +1,707 @@
+/* Admin operations pages: devices, alerts, maintenance, simulator. */
+
+/* ---------- Device cards ---------- */
+
+.admin-device-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.admin-app .admin-device-card {
+  position: relative;
+  display: grid;
+  gap: 6px;
+  align-content: start;
+  min-height: 150px;
+  padding: 14px 14px 12px 30px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 180ms ease-out, border-color 180ms ease-out;
+}
+
+.admin-app .admin-device-card:hover,
+.admin-app .admin-device-card.is-selected {
+  transform: translateY(-2px);
+  border-color: var(--accent);
+}
+
+.admin-device-card.is-skeleton {
+  cursor: default;
+}
+
+.admin-device-spine,
+.admin-alert-spine {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 16px;
+  background: var(--success);
+}
+
+.admin-device-card.is-offline .admin-device-spine { background: var(--text-2); }
+.admin-device-card.is-fault .admin-device-spine { background: var(--rose); }
+
+.admin-device-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.admin-device-head code {
+  color: var(--accent);
+  font-size: 12px;
+}
+
+.admin-device-card b {
+  font-family: var(--font-serif);
+  font-size: 18px;
+  line-height: 1.3;
+}
+
+.admin-device-meta {
+  color: var(--text-2);
+  font-size: 13px;
+}
+
+.admin-device-foot {
+  display: grid;
+  gap: 2px;
+  margin-top: auto;
+  padding-top: 8px;
+  border-top: 1px dashed var(--line);
+  color: var(--text-2);
+  font-size: 12px;
+}
+
+.admin-device-foot .mono {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------- Config editor & test console ---------- */
+
+.admin-config {
+  display: grid;
+  gap: 6px;
+}
+
+.admin-config label,
+.admin-test h4 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.admin-config textarea {
+  width: 100%;
+  resize: vertical;
+  padding: 10px 12px;
+  border: 2px solid var(--line);
+  border-radius: 10px;
+  background: var(--field);
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.admin-config textarea:focus {
+  border-color: var(--accent);
+}
+
+.admin-config textarea[aria-invalid="true"] {
+  border-color: var(--danger);
+}
+
+.admin-config strong {
+  color: var(--danger);
+  font-size: 13px;
+}
+
+.admin-config-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.admin-app .admin-config-actions .qa-button,
+.admin-app .admin-alert-actions .qa-button,
+.admin-app .admin-test-row .qa-button {
+  min-height: 38px;
+  padding: 0 14px;
+  font-size: 13px;
+}
+
+.admin-test {
+  display: grid;
+  gap: 8px;
+}
+
+.admin-test-row {
+  display: flex;
+  gap: 8px;
+}
+
+.admin-test-row select,
+.admin-sim-target select,
+.admin-form select,
+.admin-form input,
+.admin-form textarea {
+  min-height: 40px;
+  padding: 0 12px;
+  border: 2px solid var(--line);
+  border-radius: 10px;
+  background: var(--field);
+  color: var(--text);
+}
+
+.admin-test-row select {
+  flex: 1;
+}
+
+.admin-test-log {
+  max-height: 180px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #1B0D10;
+  color: #F3E6D8;
+  font-size: 12px;
+  list-style: none;
+}
+
+.admin-test-log li {
+  padding: 2px 0;
+}
+
+.admin-test-log li span {
+  opacity: .6;
+}
+
+.admin-test-log li.is-ok { color: #8FE0B4; }
+.admin-test-log li.is-fail { color: #FF8C9B; }
+.admin-test-log li.admin-muted { color: #C4AFA2; }
+
+/* ---------- Alerts board ---------- */
+
+.admin-folder .qa-tabs {
+  border-bottom: 0;
+  padding: 0;
+}
+
+.admin-folder-panel {
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 0 var(--radius-panel) var(--radius-panel) var(--radius-panel);
+  background: var(--surface);
+}
+
+.admin-tab-count {
+  margin-left: 4px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  font-size: 11px;
+}
+
+.admin-alert-board {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  align-items: start;
+}
+
+.admin-alert-lane {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border-radius: 12px;
+  background: var(--bg);
+}
+
+.admin-alert-lane h2 {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 0 0 2px;
+  font-size: 14px;
+}
+
+.admin-alert-lane h2 .mono {
+  color: var(--text-2);
+}
+
+.admin-alert-cards {
+  display: grid;
+  gap: 8px;
+}
+
+.admin-lane-empty {
+  margin: 0;
+  padding: 12px;
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+  color: var(--text-2);
+  font-size: 13px;
+  text-align: center;
+}
+
+.admin-alert-card {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.admin-alert-card .admin-alert-spine { width: 8px; background: var(--info); }
+.admin-alert-card.is-critical .admin-alert-spine { background: var(--rose); }
+.admin-alert-card.is-warning .admin-alert-spine { background: var(--wood); }
+
+.admin-alert-card.is-critical {
+  border-color: color-mix(in srgb, var(--rose) 45%, var(--line));
+}
+
+.admin-alert-card.is-fresh {
+  background: color-mix(in srgb, var(--blush) 22%, var(--surface));
+}
+
+.admin-app .admin-alert-open {
+  width: 100%;
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px 8px 18px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.admin-alert-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.admin-alert-head b {
+  font-size: 14px;
+}
+
+.admin-alert-head time {
+  color: var(--text-2);
+}
+
+.admin-alert-message {
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.admin-alert-meta {
+  color: var(--text-2);
+  font-size: 12px;
+}
+
+.admin-alert-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  padding: 0 10px 10px 18px;
+}
+
+.admin-alert-summary {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px 12px 24px;
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.admin-alert-summary::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 12px;
+  background: var(--info);
+}
+
+.admin-alert-summary.is-critical::before { background: var(--rose); }
+.admin-alert-summary.is-warning::before { background: var(--wood); }
+
+.admin-alert-summary p {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: 17px;
+}
+
+.admin-alert-summary .qa-badge {
+  justify-self: start;
+}
+
+.admin-bell-all {
+  display: block;
+  margin-top: 8px;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: right;
+  text-decoration: none;
+}
+
+/* ---------- Clip player ---------- */
+
+.admin-clip {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+}
+
+.admin-clip video,
+.admin-clip-screen {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 10px;
+  background: #120A0B;
+}
+
+.admin-clip-screen {
+  position: relative;
+  overflow: hidden;
+}
+
+.admin-clip-screen svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.admin-clip-rec,
+.admin-clip-time,
+.admin-clip-sim {
+  position: absolute;
+  color: #F3E6D8;
+  font-size: 11px;
+  text-shadow: 0 1px 2px #000;
+}
+
+.admin-clip-rec {
+  top: 8px;
+  left: 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+}
+
+.admin-clip-rec i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--rose);
+  animation: qa-shelf-pulse 1.2s ease-in-out infinite;
+}
+
+.admin-clip-time {
+  right: 10px;
+  bottom: 8px;
+}
+
+.admin-clip-sim {
+  top: 8px;
+  right: 10px;
+  padding: 1px 8px;
+  border: 1px solid rgba(243, 230, 216, .5);
+  border-radius: 999px;
+}
+
+.admin-clip-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--text-2);
+}
+
+.admin-clip-controls button {
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-ink);
+  cursor: pointer;
+}
+
+.admin-clip-controls input[type="range"] {
+  flex: 1;
+  accent-color: var(--accent);
+  background: linear-gradient(90deg, transparent calc(var(--alert-at) - 1px), var(--rose) calc(var(--alert-at) - 1px), var(--rose) calc(var(--alert-at) + 1px), transparent calc(var(--alert-at) + 1px));
+}
+
+.admin-clip figcaption {
+  color: var(--text-2);
+  font-size: 12px;
+}
+
+/* ---------- Maintenance ---------- */
+
+.admin-maintenance {
+  display: grid;
+  grid-template-columns: minmax(260px, 340px) minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.admin-form {
+  position: relative;
+  display: grid;
+  gap: 6px;
+  padding: 16px 16px 16px 30px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-panel);
+  background: var(--surface);
+}
+
+.admin-form::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 14px;
+  background: var(--wood);
+}
+
+.admin-form h2 {
+  margin: 0 0 6px;
+  font-size: 18px;
+}
+
+.admin-form label {
+  margin-top: 4px;
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.admin-form textarea {
+  padding: 8px 12px;
+  resize: vertical;
+}
+
+.admin-form select:focus,
+.admin-form input:focus,
+.admin-form textarea:focus {
+  border-color: var(--accent);
+}
+
+.admin-form [aria-invalid="true"] {
+  border-color: var(--danger);
+}
+
+.admin-form strong,
+.admin-form-error {
+  color: var(--danger);
+  font-size: 13px;
+}
+
+.admin-form-error {
+  margin: 4px 0 0;
+}
+
+.admin-form-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.admin-form-pair > div {
+  display: grid;
+  gap: 6px;
+}
+
+.admin-form-pair input {
+  width: 100%;
+  min-width: 0;
+}
+
+.admin-form .qa-button {
+  margin-top: 10px;
+}
+
+.admin-form-linked {
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--accent-soft);
+  font-size: 12px;
+}
+
+.admin-kind {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 4px;
+  background: var(--surface-2);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.admin-kind.is-device_repair { background: var(--status-overdue-bg); color: var(--status-overdue-fg); }
+.admin-kind.is-book_mending { background: var(--status-borrowed-bg); color: var(--status-borrowed-fg); }
+
+.admin-clamp {
+  display: -webkit-box;
+  max-width: 280px;
+  overflow: hidden;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.admin-detail-text {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: 17px;
+}
+
+.admin-app .admin-dl {
+  display: grid;
+  grid-template-columns: 90px 1fr;
+  gap: 6px 10px;
+  margin: 0;
+  font-size: 14px;
+}
+
+.admin-dl dt {
+  color: var(--text-2);
+}
+
+.admin-dl dd {
+  margin: 0;
+}
+
+/* ---------- Simulator ---------- */
+
+.admin-sim {
+  display: grid;
+  grid-template-columns: minmax(240px, 300px) minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.admin-sim-log {
+  grid-column: 1 / -1;
+}
+
+.admin-sim-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-2);
+  font-size: 13px;
+}
+
+.admin-sim-active {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+}
+
+.admin-sim-target {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-2);
+  font-size: 13px;
+}
+
+.admin-sim-buttons {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.admin-app .admin-sim-button {
+  position: relative;
+  display: grid;
+  gap: 4px;
+  min-height: 96px;
+  padding: 12px 12px 10px 26px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 150ms ease-out, border-color 180ms ease-out;
+}
+
+.admin-app .admin-sim-button::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 12px;
+  background: var(--wood);
+}
+
+.admin-app .admin-sim-button.is-danger::before { background: var(--rose); }
+.admin-app .admin-sim-button.is-recover::before { background: var(--success); }
+
+.admin-app .admin-sim-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  border-color: var(--accent);
+}
+
+.admin-app .admin-sim-button:active:not(:disabled) {
+  transform: scale(.98);
+}
+
+.admin-app .admin-sim-button:disabled {
+  cursor: progress;
+  opacity: .6;
+}
+
+.admin-sim-button b {
+  font-family: var(--font-serif);
+  font-size: 16px;
+}
+
+.admin-sim-button small {
+  color: var(--text-2);
+  font-size: 12px;
+}
+
+.admin-sim-button code {
+  color: var(--accent);
+  font-size: 11px;
+}
+
+@media (max-width: 1000px) {
+  .admin-alert-board,
+  .admin-maintenance,
+  .admin-sim {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-clip-rec i {
+    animation: none;
+  }
+}

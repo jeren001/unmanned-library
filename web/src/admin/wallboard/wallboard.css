@@ -1,0 +1,650 @@
+/* /admin/wallboard — designed for 1920x1080; 1rem = 16px at 1920 wide and scales with the viewport. */
+
+.wb-root {
+  --wb-gap: .75rem;
+  font-size: min(calc(100vw / 120), calc(100vh / 67.5));
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: 1fr 1.55fr 1.05fr;
+  grid-template-rows: 4.5rem 9.5rem minmax(0, 1fr) minmax(0, .92fr);
+  grid-template-areas:
+    "head head head"
+    "kpi kpi kpi"
+    "env chart alerts"
+    "devices flow alerts";
+  gap: var(--wb-gap);
+  padding: var(--wb-gap);
+  background:
+    radial-gradient(circle at 12% -10%, rgba(232, 86, 107, .14), transparent 40%),
+    var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+}
+
+.wb-root:fullscreen {
+  width: 100vw;
+  height: 100vh;
+}
+
+.wb-root .qa-sr-only {
+  position: absolute;
+}
+
+/* ---------- Header strip ---------- */
+
+.wb-header {
+  grid-area: head;
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  padding: 0 1.25rem;
+  border: 1px solid var(--line);
+  border-bottom: .3rem solid var(--burgundy);
+  border-radius: .9rem;
+  background: var(--surface);
+}
+
+.wb-title {
+  display: grid;
+  margin-right: auto;
+}
+
+.wb-title b {
+  font-family: var(--font-serif);
+  font-size: 1.6rem;
+  letter-spacing: .06em;
+}
+
+.wb-title span {
+  color: var(--text-2);
+  font-size: .85rem;
+  letter-spacing: .2em;
+}
+
+.wb-branch select {
+  min-height: 2.4rem;
+  padding: 0 2.2rem 0 .9rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--bg) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23F4B6B0' stroke-width='2'%3E%3Cpath d='m8 10 4 4 4-4'/%3E%3C/svg%3E") no-repeat right .7rem center / 1rem;
+  color: var(--text);
+  font-size: 1rem;
+  appearance: none;
+  cursor: pointer;
+}
+
+.wb-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: .5rem;
+  padding: .35rem .9rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: .95rem;
+  font-weight: 700;
+}
+
+.wb-pill i {
+  width: .65rem;
+  height: .65rem;
+  border-radius: 50%;
+  background: var(--text-2);
+}
+
+.wb-pill small {
+  color: var(--text-2);
+  font-weight: 400;
+}
+
+.wb-pill.is-live { border-color: color-mix(in srgb, var(--success) 50%, var(--line)); color: var(--success); }
+.wb-pill.is-live i { background: var(--success); animation: wb-live 1.6s ease-in-out infinite; }
+.wb-pill.is-reconnecting { color: var(--warn); }
+.wb-pill.is-reconnecting i { background: var(--warn); }
+.wb-pill.is-offline { color: var(--danger); }
+.wb-pill.is-offline i { background: var(--danger); }
+
+@keyframes wb-live {
+  50% { box-shadow: 0 0 0 .35rem rgba(95, 191, 143, 0); }
+  0% { box-shadow: 0 0 0 0 rgba(95, 191, 143, .6); }
+}
+
+.wb-keys {
+  color: var(--text-2);
+  font-size: .8rem;
+}
+
+.wb-keys kbd {
+  padding: 0 .35rem;
+  border: 1px solid var(--line);
+  border-radius: .25rem;
+  font-family: var(--font-mono);
+}
+
+.wb-clock {
+  display: grid;
+  justify-items: end;
+}
+
+.wb-clock b {
+  font-size: 2rem;
+  line-height: 1.1;
+  letter-spacing: .04em;
+  font-variant-numeric: tabular-nums;
+}
+
+.wb-clock small {
+  color: var(--text-2);
+  font-size: .8rem;
+}
+
+.wb-exit {
+  color: var(--text-2);
+  font-size: .85rem;
+  text-decoration: none;
+}
+
+.wb-exit:hover,
+.wb-exit:focus-visible {
+  color: var(--blush);
+}
+
+/* ---------- KPI cards ---------- */
+
+.wb-kpis {
+  grid-area: kpi;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: var(--wb-gap);
+}
+
+.wb-kpi {
+  position: relative;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  padding: .9rem 1rem .6rem 1.4rem;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: .9rem;
+  background: var(--surface);
+}
+
+.wb-kpi::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: .45rem;
+  background: var(--accent);
+}
+
+.wb-kpi.is-success::before { background: var(--success); }
+.wb-kpi.is-warn::before { background: var(--warn); }
+.wb-kpi.is-critical::before { background: var(--rose); }
+
+.wb-kpi.is-critical {
+  border-color: color-mix(in srgb, var(--rose) 60%, var(--line));
+  animation: wb-critical 1.8s ease-in-out infinite;
+}
+
+.wb-kpi header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: .5rem;
+  font-size: 1rem;
+}
+
+.wb-kpi header small {
+  color: var(--text-2);
+  font-size: .72rem;
+  white-space: nowrap;
+}
+
+.wb-kpi > b {
+  align-self: center;
+  font-family: var(--font-serif);
+  font-size: 3rem;
+  line-height: 1;
+}
+
+/* Odometer digits */
+.wb-rolling {
+  display: inline-flex;
+  align-items: baseline;
+  font-variant-numeric: tabular-nums;
+}
+
+.wb-rolling small {
+  margin-left: .2em;
+  color: var(--text-2);
+  font-size: .45em;
+}
+
+.wb-digit {
+  display: inline-block;
+  height: 1em;
+  overflow: hidden;
+  line-height: 1;
+}
+
+.wb-digit > span {
+  display: flex;
+  flex-direction: column;
+  transition: transform .9s cubic-bezier(.2, .9, .3, 1);
+}
+
+.wb-digit i {
+  height: 1em;
+  font-style: normal;
+}
+
+.wb-sep {
+  line-height: 1;
+}
+
+.wb-rolling.is-empty {
+  color: var(--text-2);
+}
+
+/* Sparklines */
+.wb-spark {
+  width: 100%;
+  height: 1.9rem;
+}
+
+.wb-spark-line {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.6;
+  vector-effect: non-scaling-stroke;
+}
+
+.wb-spark-line.is-flat {
+  stroke: var(--line);
+}
+
+.wb-spark-fill {
+  fill: color-mix(in srgb, var(--accent) 16%, transparent);
+  stroke: none;
+}
+
+.wb-spark.is-success .wb-spark-line { stroke: var(--success); }
+.wb-spark.is-success .wb-spark-fill { fill: color-mix(in srgb, var(--success) 16%, transparent); }
+.wb-spark.is-warn .wb-spark-line { stroke: var(--warn); }
+.wb-spark.is-warn .wb-spark-fill { fill: color-mix(in srgb, var(--warn) 16%, transparent); }
+.wb-spark.is-critical .wb-spark-line { stroke: var(--rose); }
+.wb-spark.is-critical .wb-spark-fill { fill: color-mix(in srgb, var(--rose) 18%, transparent); }
+
+/* ---------- Panels ---------- */
+
+.wb-panel {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: .6rem;
+  padding: .9rem 1rem;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: .9rem;
+  background: var(--surface);
+}
+
+.wb-panel h2 {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin: 0;
+  font-size: 1.15rem;
+  color: var(--blush);
+}
+
+.wb-panel h2 small {
+  color: var(--text-2);
+  font-family: var(--font-sans);
+  font-size: .78rem;
+  font-weight: 400;
+}
+
+.wb-env-panel { grid-area: env; }
+.wb-chart-panel { grid-area: chart; }
+.wb-alert-panel { grid-area: alerts; }
+.wb-device-panel { grid-area: devices; }
+.wb-flow-panel { grid-area: flow; }
+
+.wb-empty {
+  margin: auto;
+  color: var(--text-2);
+  font-size: 1rem;
+}
+
+/* ---------- Environment ---------- */
+
+.wb-env-grid {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-rows: minmax(0, 1fr);
+  gap: .6rem;
+}
+
+.wb-env {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-rows: auto 1fr auto;
+  align-items: end;
+  padding: .55rem .75rem .35rem;
+  border: 1px solid var(--line);
+  border-left: .3rem solid var(--success);
+  border-radius: .6rem;
+  background: var(--bg);
+}
+
+.wb-env:last-child:nth-child(odd) {
+  grid-column: 1 / -1;
+}
+
+.wb-env.is-warn { border-left-color: var(--warn); }
+.wb-env.is-critical { border-left-color: var(--rose); animation: wb-critical 1.8s ease-in-out infinite; }
+
+.wb-env-label {
+  grid-column: 1;
+  color: var(--text-2);
+  font-size: .85rem;
+}
+
+.wb-env-level {
+  grid-column: 2;
+  grid-row: 1;
+  font-size: .72rem;
+  color: var(--success);
+}
+
+.wb-env.is-warn .wb-env-level { color: var(--warn); }
+.wb-env.is-critical .wb-env-level { color: var(--rose); }
+
+.wb-env b {
+  grid-column: 1 / -1;
+  font-size: 1.9rem;
+  line-height: 1.1;
+}
+
+.wb-env b small {
+  margin-left: .2em;
+  color: var(--text-2);
+  font-size: .5em;
+}
+
+.wb-env .wb-spark {
+  grid-column: 1 / -1;
+  height: 1.4rem;
+}
+
+/* ---------- Chart ---------- */
+
+.wb-chart {
+  flex: 1;
+  min-height: 0;
+}
+
+/* ---------- Alert feed ---------- */
+
+.wb-alert-panel.has-critical {
+  border-color: color-mix(in srgb, var(--rose) 55%, var(--line));
+}
+
+.wb-feed {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+  scrollbar-width: none;
+}
+
+.wb-feed::-webkit-scrollbar {
+  display: none;
+}
+
+.wb-alert {
+  position: relative;
+  display: grid;
+  grid-template-columns: 4.6rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: .7rem;
+  margin-bottom: .5rem;
+  padding: .6rem .7rem .6rem 1rem;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: .6rem;
+  background: var(--bg);
+}
+
+.wb-alert::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: .35rem;
+  background: var(--info);
+}
+
+.wb-alert.is-warning::before { background: var(--warn); }
+.wb-alert.is-critical::before { background: var(--rose); }
+.wb-alert.is-acked { opacity: .7; }
+
+.wb-alert.is-pulsing {
+  border-color: var(--rose);
+  animation: wb-critical 1.4s ease-in-out infinite;
+}
+
+@keyframes wb-critical {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(232, 86, 107, 0); }
+  50% { box-shadow: 0 0 0 .3rem rgba(232, 86, 107, .35); background: color-mix(in srgb, var(--rose) 12%, var(--bg)); }
+}
+
+.wb-alert-sev {
+  font-size: .78rem;
+  font-weight: 700;
+  color: var(--info);
+}
+
+.wb-alert.is-warning .wb-alert-sev { color: var(--warn); }
+.wb-alert.is-critical .wb-alert-sev { color: var(--blush); }
+
+.wb-alert b {
+  display: block;
+  overflow: hidden;
+  font-size: 1rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wb-alert small {
+  color: var(--text-2);
+  font-size: .78rem;
+}
+
+.wb-alert button {
+  min-height: 2rem;
+  padding: 0 .8rem;
+  border: 1px solid var(--accent);
+  border-radius: .5rem;
+  background: transparent;
+  color: var(--accent);
+  font-size: .82rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.wb-alert button:hover:not(:disabled) {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.wb-alert-state {
+  color: var(--text-2);
+  font-size: .78rem;
+}
+
+/* ---------- Device matrix ---------- */
+
+.wb-matrix {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  align-content: start;
+  gap: .45rem;
+  overflow: hidden;
+}
+
+.wb-matrix-row {
+  display: grid;
+  grid-template-columns: 6.5rem minmax(0, 1fr) 3rem;
+  align-items: center;
+  gap: .6rem;
+}
+
+.wb-matrix-kind {
+  color: var(--text-2);
+  font-size: .8rem;
+  white-space: nowrap;
+}
+
+.wb-matrix-cells {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .3rem;
+}
+
+.wb-cell {
+  width: .95rem;
+  height: .95rem;
+  border-radius: .2rem;
+  background: var(--success);
+}
+
+.wb-cell.is-offline { background: var(--line); outline: 1px solid var(--text-2); outline-offset: -1px; }
+.wb-cell.is-fault { background: var(--rose); }
+
+.wb-matrix-count {
+  color: var(--text-2);
+  font-size: .78rem;
+  text-align: right;
+}
+
+/* ---------- Event flow ---------- */
+
+.wb-flow {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+}
+
+.wb-flow-link {
+  fill: none;
+  stroke: var(--line);
+  stroke-width: 2;
+  stroke-dasharray: 4 6;
+}
+
+.wb-flow-node rect {
+  fill: var(--bg);
+  stroke: var(--line);
+  stroke-width: 1.5;
+}
+
+.wb-flow-node.is-bus rect {
+  fill: color-mix(in srgb, var(--burgundy) 55%, var(--bg));
+  stroke: var(--accent);
+}
+
+.wb-flow-node text {
+  fill: var(--text);
+  font-family: var(--font-sans);
+  font-size: 12px;
+}
+
+.wb-flow-node .wb-flow-count {
+  fill: var(--text-2);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.wb-flow-flash {
+  fill: none;
+  stroke: var(--blush);
+  stroke-width: 3;
+  opacity: 0;
+  animation: wb-flash .9s ease-out;
+}
+
+@keyframes wb-flash {
+  0% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+.wb-flow-dot { fill: var(--accent); }
+.wb-flow-dot.is-alert { fill: var(--rose); }
+.wb-flow-dot.is-info { fill: var(--blush); }
+
+/* ---------- Reduced motion ---------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .wb-digit > span {
+    transition: none;
+  }
+
+  .wb-pill.is-live i,
+  .wb-kpi.is-critical,
+  .wb-env.is-critical,
+  .wb-alert.is-pulsing {
+    animation: none;
+  }
+
+  /* Without the pulse, critical items stay visibly marked until acknowledged. */
+  .wb-alert.is-pulsing {
+    border-width: 2px;
+    background: color-mix(in srgb, var(--rose) 14%, var(--bg));
+  }
+
+  .wb-flow-flash {
+    animation: none;
+  }
+}
+
+/* Smaller than the wallboard target: stack instead of squeezing. */
+@media (max-width: 1100px), (max-height: 640px) {
+  .wb-root {
+    height: auto;
+    min-height: 100vh;
+    overflow: visible;
+    font-size: 14px;
+    grid-template-columns: 1fr;
+    grid-template-rows: auto;
+    grid-template-areas: "head" "kpi" "alerts" "chart" "env" "devices" "flow";
+  }
+
+  .wb-header,
+  .wb-kpis {
+    flex-wrap: wrap;
+  }
+
+  .wb-header {
+    padding: .75rem 1rem;
+  }
+
+  .wb-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .wb-panel {
+    min-height: 18rem;
+  }
+
+  .wb-feed {
+    max-height: 22rem;
+  }
+}

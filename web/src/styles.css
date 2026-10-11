@@ -1,57 +1,121 @@
 @import "tailwindcss";
 
-@theme {
-  --color-paper: var(--paper);
-  --color-paper-2: var(--paper-2);
-  --color-surface: var(--surface);
-  --color-ink: var(--ink);
-  --color-ink-2: var(--ink-2);
-  --color-line: var(--line);
-  --color-accent: var(--accent);
-  --color-accent-ink: var(--accent-ink);
-  --color-brass: var(--brass);
-  --color-ok: var(--ok);
-  --color-warn: var(--warn);
-  --color-danger: var(--danger);
-  --color-info: var(--info);
-  --font-display: Fraunces, "Noto Serif SC", serif;
-  --font-ui: Inter, "Noto Sans SC", sans-serif;
-  --font-mono: "JetBrains Mono", monospace;
-}
-
+/*
+ * Burgundy & cream library theme.
+ * Palette tokens (--burgundy … --success) are the raw colours from the design reference.
+ * Semantic tokens (--bg, --surface, --text, --accent …) are what components use; they switch
+ * between the light theme and the dark "wallboard" theme ([data-theme="dark"] or "wallboard").
+ */
 :root {
-  --paper: #F4F0E7;
-  --paper-2: #EBE5D8;
-  --surface: #FBF9F4;
-  --ink: #15211C;
-  --ink-2: #4A5650;
-  --line: #D9D2C2;
-  --accent: #1F4D3A;
-  --accent-ink: #F4F0E7;
-  --brass: #B07A1E;
-  --ok: #2E7D5B;
-  --warn: #B7791F;
-  --danger: #B3372B;
-  --info: #2F5D8A;
+  --burgundy: #8E1B2E;
+  --burgundy-deep: #5A1220;
+  --rose: #D6384F;
+  --blush: #F4B6B0;
+  --wood: #A35B33;
+  --wood-deep: #8A4B2A;
+  --cream: #FBF1E1;
+  --paper: #FFFBF3;
+  --ink: #231815;
+  --line: #E6D6BE;
+  --success: #276E50; /* darkened from #2E7D5B for 4.5:1 text contrast on cream */
+
+  --bg: var(--cream);
+  --surface: var(--paper);
+  --surface-2: #F1E4CC;
+  --field: #FFFFFF;
+  --text: var(--ink);
+  --text-2: #6B5F52;
+  --accent: var(--burgundy);
+  --accent-hover: #A3233A;
+  --accent-ink: var(--cream);
+  --accent-soft: color-mix(in srgb, var(--blush) 22%, transparent);
+  --focus: var(--rose);
+  --warn: var(--wood-deep);
+  --danger: #B02239;
+  --info: #7A4E63;
+
+  /* status badge fills */
+  --status-in-bg: #DDEFE5;
+  --status-in-fg: var(--success);
+  --status-borrowed-bg: #F6E3D3;
+  --status-borrowed-fg: var(--wood-deep);
+  --status-overdue-bg: #F4D6D9;
+  --status-overdue-fg: var(--burgundy);
+  --status-repair-bg: #EFE7DA;
+  --status-repair-fg: #6B5F52;
+
+  --font-serif: "Songti SC", "Noto Serif SC", "Source Han Serif SC", Georgia, serif;
+  --font-sans: system-ui, -apple-system, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+
+  --radius-control: 12px;
+  --radius-panel: 16px;
+  --ease-out: cubic-bezier(.2, .9, .3, 1);
+  --ease-spring: cubic-bezier(.2, 1.15, .4, 1);
+  --ease-page: cubic-bezier(.6, .05, .2, 1);
+
   color-scheme: light;
 }
 
-[data-theme="dark"] {
-  --paper: #0F1714;
-  --paper-2: #101A16;
-  --surface: #16211D;
-  --ink: #E8E4D8;
-  --ink-2: #9AA79F;
-  --line: #2A3A34;
-  --accent: #6FB38F;
-  --accent-ink: #0F1714;
-  --brass: #D9A441;
-  --ok: #5FBF8F;
-  --warn: #E0A640;
-  --danger: #E5675A;
-  --info: #7EA8D6;
-  --surface-2: #1D2B26;
+[data-theme="dark"],
+[data-theme="wallboard"] {
+  --bg: #1B0D10;
+  --surface: #2A1418;
+  --surface-2: #351A1F;
+  --field: #22100F;
+  --line: #4A2A30;
+  --text: #F3E6D8;
+  --text-2: #C4AFA2;
+  --accent: #E8566B;
+  --accent-hover: #F06C7F;
+  --accent-ink: #1B0D10;
+  --accent-soft: color-mix(in srgb, #E8566B 16%, transparent);
+  --blush: #F4B6B0;
+  --success: #5FBF8F;
+  --focus: #F4B6B0;
+  --warn: #E0A060;
+  --danger: #FF7A8A;
+  --info: #D9B8C4;
+
+  --status-in-bg: color-mix(in srgb, #5FBF8F 18%, transparent);
+  --status-in-fg: #5FBF8F;
+  --status-borrowed-bg: color-mix(in srgb, #E0A060 18%, transparent);
+  --status-borrowed-fg: #E0A060;
+  --status-overdue-bg: color-mix(in srgb, #E8566B 22%, transparent);
+  --status-overdue-fg: #FF8C9B;
+  --status-repair-bg: color-mix(in srgb, #F3E6D8 10%, transparent);
+  --status-repair-fg: #C4AFA2;
+
   color-scheme: dark;
+}
+
+/* Tailwind theme: utilities follow the runtime tokens, so they switch with data-theme. */
+@theme inline {
+  --color-burgundy: var(--burgundy);
+  --color-burgundy-deep: var(--burgundy-deep);
+  --color-rose: var(--rose);
+  --color-blush: var(--blush);
+  --color-wood: var(--wood);
+  --color-cream: var(--cream);
+  --color-paper: var(--paper);
+  --color-ink: var(--ink);
+  --color-line: var(--line);
+  --color-success: var(--success);
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-text: var(--text);
+  --color-text-2: var(--text-2);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-warn: var(--warn);
+  --color-danger: var(--danger);
+  --color-info: var(--info);
+  --font-serif: var(--font-serif);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+  --radius-control: var(--radius-control);
+  --radius-panel: var(--radius-panel);
 }
 
 * {
@@ -59,9 +123,10 @@
 }
 
 html {
-  background: var(--paper);
-  color: var(--ink);
-  font-family: Inter, "Noto Sans SC", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  line-height: 1.55;
   letter-spacing: 0;
 }
 
@@ -69,10 +134,22 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
-  background:
-    linear-gradient(90deg, color-mix(in srgb, var(--line) 34%, transparent) 1px, transparent 1px) 0 0 / 72px 72px,
-    var(--paper);
-  color: var(--ink);
+  background: var(--bg);
+  color: var(--text);
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-serif);
+}
+
+code,
+kbd,
+samp,
+.mono {
+  font-family: var(--font-mono);
 }
 
 button,
@@ -82,22 +159,21 @@ textarea {
   font: inherit;
 }
 
-button,
-a,
-input,
-select,
-textarea,
-[tabindex]:not([tabindex="-1"]) {
+/* Pointer focus stays quiet; keyboard focus always gets the ring (the old element list
+   had higher specificity than :focus-visible and hid it on [tabindex] tabs and rows). */
+:focus:not(:focus-visible) {
   outline: none;
 }
 
-:focus-visible {
-  outline: 2px solid var(--brass);
+:focus-visible,
+/* Tabbing through a date input moves focus into its inner (shadow) segments, where neither :focus nor :focus-visible matches the input. */
+input:is([type="date"], [type="datetime-local"], [type="time"]):focus-within {
+  outline: 3px solid var(--focus);
   outline-offset: 2px;
 }
 
 ::selection {
-  background: var(--brass);
+  background: var(--blush);
   color: var(--ink);
 }
 

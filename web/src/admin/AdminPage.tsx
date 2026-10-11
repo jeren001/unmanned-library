@@ -1,250 +1,355 @@
-import { useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { Navigate, useLocation, useNavigate } from "react-router";
-import { LangSwitch, Logo, SegmentedControl } from "../shared/components";
-import { BellIcon, ChevronIcon, CloseIcon, InfoIcon } from "../shared/icons";
+import { Navigate, NavLink, Route, Routes, useLocation, useNavigate } from "react-router";
+import { Button, LangSwitch, SegmentedControl, Skeleton, StatusBadge, ToastProvider, useToast } from "../shared/components";
+import { BellIcon } from "../shared/icons";
+import { BookSpinesBand } from "../shared/motion";
+import { ApiError, fetchBranches, fetchMe, fetchOpenAlerts, logout, type AlertRow, type Branch, type Role, type SessionUser } from "./adminApi";
+import { ErrorPanel, formatDate } from "./adminUi";
+import { AdminContext, AdminEventHub, type AdminContextValue } from "./adminContext";
+import { CommandPalette, type Command } from "./CommandPalette";
+import { BooksPage, CirculationPage, ReadersPage } from "./ListPages";
+import { AlertsPage } from "./AlertsPage";
+import { DevicesPage } from "./DevicesPage";
+import { MaintenancePage } from "./MaintenancePage";
+import { OverviewPage, RulesPage } from "./OverviewRules";
+import { SimulatorPage } from "./SimulatorPage";
+import { TracePage } from "./TracePage";
+import { ExportsPage } from "./ExportsPage";
 import "./admin.css";
 
-type Role = "reader" | "librarian" | "admin";
-type ThemeMode = "light" | "dark";
-type User = { id: string; role: Role; name: string; account: string };
-type Branch = { id: string; code: string; name_zh: string; name_en: string };
-type Overview = { branches: number; books: number; readers: number; devicesOnline: number; activeLoans: number; openAlerts: number };
+type Theme = "light" | "dark";
+type NavItem = { key: string; path: string; roles: Role[]; plate: string };
 
-const navGroups = [
-  { key: "overview", items: [{ key: "overview", icon: "◈" }] },
-  { key: "catalogue", items: [{ key: "books", icon: "▤" }] },
-  { key: "readers", items: [{ key: "readers", icon: "◎" }] },
-  { key: "circulation", items: [{ key: "circulation", icon: "↔" }] },
-  { key: "devices", items: [{ key: "devices", icon: "⌁" }] },
-  { key: "alerts", items: [{ key: "alerts", icon: "!" }] },
-  { key: "telemetry", items: [{ key: "telemetry", icon: "⌁" }] },
-  { key: "maintenance", items: [{ key: "maintenance", icon: "＋" }] },
-  { key: "traceability", items: [{ key: "traceability", icon: "⌗" }] },
-  { key: "exports", items: [{ key: "exports", icon: "↓" }] },
-  { key: "settings", items: [{ key: "settings", icon: "⚙" }] }
-] as const;
+const NAV: NavItem[] = [
+  { key: "overview", path: "", roles: ["librarian", "admin"], plate: "000" },
+  { key: "books", path: "books", roles: ["librarian", "admin"], plate: "100" },
+  { key: "readers", path: "readers", roles: ["librarian", "admin"], plate: "200" },
+  { key: "circulation", path: "circulation", roles: ["librarian", "admin"], plate: "300" },
+  { key: "devices", path: "devices", roles: ["librarian", "admin"], plate: "400" },
+  { key: "alerts", path: "alerts", roles: ["librarian", "admin"], plate: "500" },
+  { key: "maintenance", path: "maintenance", roles: ["librarian", "admin"], plate: "600" },
+  { key: "telemetry", path: "telemetry", roles: ["librarian", "admin"], plate: "700" },
+  { key: "trace", path: "trace", roles: ["librarian", "admin"], plate: "750" },
+  { key: "exports", path: "exports", roles: ["librarian", "admin"], plate: "800" },
+  { key: "rules", path: "settings/rules", roles: ["admin"], plate: "900" },
+  { key: "simulator", path: "settings/simulator", roles: ["admin"], plate: "950" }
+];
 
-function api<T>(path: string, init?: RequestInit) {
-  return fetch(path, { credentials: "include", ...init }).then(async (response) => {
-    const body = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(String(body.error ?? body.code ?? "REQUEST_FAILED"));
-    return body as T;
-  });
-}
+const THEME_KEY = "ul-admin-theme";
 
-function routeKey(pathname: string) {
-  return pathname.split("/")[2] || "overview";
+// Loaded on demand so ECharts is only downloaded for the wallboard.
+const WallboardPage = lazy(() => import("./wallboard/WallboardPage").then((module) => ({ default: module.WallboardPage })));
+const TelemetryPage = lazy(() => import("./TelemetryPage").then((module) => ({ default: module.TelemetryPage })));
+
+function readTheme(): Theme {
+  try {
+    return localStorage.getItem(THEME_KEY) === "dark" ? "dark" : "light";
+  } catch {
+    return "light";
+  }
 }
 
 export function AdminPage() {
-  const { t, i18n } = useTranslation();
+  return (
+    <ToastProvider>
+      <AdminGate />
+    </ToastProvider>
+  );
+}
+
+/** Route guard: only librarians and admins get the console; readers go to the kiosk. */
+function AdminGate() {
+  const { t } = useTranslation();
+  const [state, setState] = useState<{ status: "loading" | "ready" | "error"; user?: SessionUser | null; error?: unknown }>({ status: "loading" });
+  const [nonce, setNonce] = useState(0);
+
+  useEffect(() => {
+    let alive = true;
+    setState({ status: "loading" });
+    fetchMe()
+      .then((user) => { if (alive) setState({ status: "ready", user }); })
+      .catch((error) => {
+        if (!alive) return;
+        if (error instanceof ApiError && error.status === 401) setState({ status: "ready", user: null });
+        else setState({ status: "error", error });
+      });
+    return () => { alive = false; };
+  }, [nonce]);
+
+  if (state.status === "loading") {
+    return (
+      <main className="admin-splash" aria-busy="true">
+        <BookSpinesBand count={24} height={40} className="is-small" />
+        <p>{t("admin.loading")}</p>
+      </main>
+    );
+  }
+  if (state.status === "error") return <main className="admin-splash"><ErrorPanel error={state.error} onRetry={() => setNonce((value) => value + 1)} /></main>;
+  if (!state.user) return <Navigate to="/login" replace />;
+  if (state.user.role === "reader") return <Navigate to="/kiosk" replace />;
+  return <AdminRoutes user={state.user} />;
+}
+
+/** The wallboard is full-bleed (no sidebar); everything else lives in the shell. */
+function AdminRoutes({ user }: { user: SessionUser }) {
+  const { t } = useTranslation();
   const location = useLocation();
+  if (location.pathname.startsWith("/admin/wallboard")) {
+    return (
+      <Suspense fallback={<main className="admin-splash" data-theme="wallboard"><BookSpinesBand count={24} height={40} className="is-small" /><p>{t("admin.wallboard.loading")}</p></main>}>
+        <WallboardPage />
+      </Suspense>
+    );
+  }
+  return <AdminShell user={user} />;
+}
+
+function RequireRole({ user, roles, children }: { user: SessionUser; roles: Role[]; children: ReactNode }) {
+  const { t } = useTranslation();
+  const toast = useToast();
+  const allowed = roles.includes(user.role);
+  const told = useRef(false);
+  useEffect(() => {
+    if (allowed || told.current) return;
+    told.current = true;
+    toast({ tone: "info", title: t("admin.forbidden.title"), body: t("admin.forbidden.body") });
+  }, [allowed, toast, t]);
+  return allowed ? <>{children}</> : <Navigate to="/admin" replace />;
+}
+
+function AdminShell({ user }: { user: SessionUser }) {
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
-  const [user, setUser] = useState<User | null>(null);
-  const [loadingAuth, setLoadingAuth] = useState(true);
-  const [collapsed, setCollapsed] = useState(false);
-  const [theme, setTheme] = useState<ThemeMode>(() => localStorage.getItem("ul-admin-theme") === "dark" ? "dark" : "light");
-  const [branchId, setBranchId] = useState("all");
+  const location = useLocation();
+  const toast = useToast();
+  const [theme, setTheme] = useState<Theme>(readTheme);
   const [branches, setBranches] = useState<Branch[]>([]);
-  const [overview, setOverview] = useState<Overview | null>(null);
-  const [alertCount, setAlertCount] = useState(0);
-  const [searchOpen, setSearchOpen] = useState(false);
-  const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const [search, setSearch] = useState("");
+  const [branchId, setBranchId] = useState("all");
+  const [alerts, setAlerts] = useState<AlertRow[]>([]);
+  const [ring, setRing] = useState(0);
+  const [bellOpen, setBellOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const bellRef = useRef<HTMLDivElement>(null);
+  const hub = useMemo(() => new AdminEventHub(), []);
 
-  const key = routeKey(location.pathname);
-  const isSettings = key === "settings";
-
-  useEffect(() => {
-    void api<{ user: User | null }>("/api/auth/me")
-      .then(({ user: nextUser }) => {
-        if (!nextUser || nextUser.role === "reader") {
-          navigate(nextUser?.role === "reader" ? "/kiosk" : "/login", { replace: true });
-          return;
-        }
-        setUser(nextUser);
-      })
-      .catch(() => navigate("/login", { replace: true }))
-      .finally(() => setLoadingAuth(false));
-  }, [navigate]);
+  const nav = NAV.filter((item) => item.roles.includes(user.role));
 
   useEffect(() => {
-    if (!user) return;
-    void api<{ data: Branch[] }>("/api/branches?limit=100").then(({ data }) => setBranches(data)).catch(() => setBranches([]));
-    void refreshOverview();
-    void refreshAlerts();
-    const stream = new EventSource(`/api/stream${branchId === "all" ? "" : `?branchId=${encodeURIComponent(branchId)}`}`);
-    const refresh = () => { void refreshOverview(); void refreshAlerts(); };
-    stream.addEventListener("alert.raised", refresh);
-    stream.addEventListener("alert.acked", refresh);
-    stream.addEventListener("alert.resolved", refresh);
-    return () => stream.close();
-  }, [user, branchId]);
+    try {
+      localStorage.setItem(THEME_KEY, theme);
+    } catch {
+      // Theme persistence is a convenience only.
+    }
+  }, [theme]);
 
   useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
-        event.preventDefault();
-        setSearchOpen(true);
-      }
-      if (event.key === "Escape") {
-        setSearchOpen(false);
-        setUserMenuOpen(false);
-      }
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
+    void fetchBranches().then(setBranches).catch(() => setBranches([]));
   }, []);
 
-  useEffect(() => localStorage.setItem("ul-admin-theme", theme), [theme]);
+  const refreshAlerts = useCallback(() => {
+    void fetchOpenAlerts(branchId).then(setAlerts).catch(() => undefined);
+  }, [branchId]);
 
-  async function refreshOverview() {
-    const query = branchId === "all" ? "" : `?branchId=${encodeURIComponent(branchId)}`;
-    try {
-      const response = await api<{ data: Overview }>(`/api/stats/overview${query}`);
-      setOverview(response.data);
-    } catch {
-      setOverview(null);
-    }
-  }
+  useEffect(refreshAlerts, [refreshAlerts]);
 
-  async function refreshAlerts() {
-    const query = new URLSearchParams({ status: "open", limit: "200" });
-    if (branchId !== "all") query.set("branchId", branchId);
-    try {
-      const response = await api<{ data: Array<unknown> }>(`/api/alerts?${query.toString()}`);
-      setAlertCount(response.data.length);
-    } catch {
-      setAlertCount(0);
-    }
-  }
+  // Live updates: new alerts ring the bell and raise a toast; KPI changes refresh the overview.
+  useEffect(() => {
+    if (typeof EventSource === "undefined") return;
+    const stream = new EventSource(`/api/stream${branchId === "all" ? "" : `?branchId=${encodeURIComponent(branchId)}`}`, { withCredentials: true });
+    const onRaised = (event: MessageEvent<string>) => {
+      let payload: { message?: string; severity?: string; duplicate?: boolean } = {};
+      try {
+        payload = JSON.parse(event.data);
+      } catch {
+        // Keep the generic toast below.
+      }
+      refreshAlerts();
+      setRefreshKey((value) => value + 1);
+      if (payload.duplicate) return;
+      setRing((value) => value + 1);
+      toast({ tone: "alert", title: t("admin.alerts.new", { severity: t(`admin.severity.${payload.severity ?? "warning"}`) }), body: payload.message });
+    };
+    const onChanged = () => { refreshAlerts(); setRefreshKey((value) => value + 1); };
+    const forward = (name: "alert.raised" | "alert.acked" | "alert.resolved" | "device.status_changed" | "kpi.updated") => (event: Event) => {
+      let payload: unknown = null;
+      try {
+        payload = JSON.parse((event as MessageEvent<string>).data);
+      } catch {
+        // Pages treat a missing payload as "something changed".
+      }
+      hub.emit(name, payload);
+    };
+    stream.addEventListener("alert.raised", onRaised as EventListener);
+    stream.addEventListener("alert.acked", onChanged);
+    stream.addEventListener("alert.resolved", onChanged);
+    stream.addEventListener("kpi.updated", onChanged);
+    for (const name of ["alert.raised", "alert.acked", "alert.resolved", "device.status_changed", "kpi.updated"] as const) stream.addEventListener(name, forward(name));
+    return () => stream.close();
+  }, [branchId, refreshAlerts, toast, t, hub]);
 
-  function go(nextKey: string) {
-    if (nextKey === "settings" && user?.role === "librarian") {
-      navigate("/admin");
-      return;
-    }
-    navigate(nextKey === "overview" ? "/admin" : `/admin/${nextKey}`);
-    setSearchOpen(false);
-  }
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setPaletteOpen((value) => !value);
+      }
+      if (event.key === "Escape") setBellOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
-  async function logout() {
-    await api("/api/auth/logout", { method: "POST" }).catch(() => undefined);
+  useEffect(() => {
+    if (!bellOpen) return;
+    const onDown = (event: MouseEvent) => { if (!bellRef.current?.contains(event.target as Node)) setBellOpen(false); };
+    window.addEventListener("mousedown", onDown);
+    return () => window.removeEventListener("mousedown", onDown);
+  }, [bellOpen]);
+
+  async function signOut() {
+    await logout();
     navigate("/login", { replace: true });
   }
 
-  const visibleGroups = useMemo(() => navGroups.map((group) => ({
-    ...group,
-    items: group.items.filter((item) => item.key !== "settings" || user?.role === "admin")
-  })).filter((group) => group.items.length > 0), [user?.role]);
+  const context = useMemo<AdminContextValue>(() => ({
+    user,
+    branches,
+    branchId,
+    branchName: (id: string) => {
+      const branch = branches.find((item) => item.id === id);
+      return branch ? (i18n.language === "en" ? branch.name_en : branch.name_zh) : id;
+    },
+    events: hub
+  }), [user, branches, branchId, i18n.language, hub]);
 
-  const searchResults = visibleGroups.flatMap((group) => group.items).filter((item) => {
-    const label = t(`admin.nav.${item.key}`).toLowerCase();
-    return !search.trim() || label.includes(search.toLowerCase());
-  });
+  const current = nav.find((item) => item.path && location.pathname.startsWith(`/admin/${item.path}`)) ?? nav[0];
+  const branchName = (branch: Branch) => (i18n.language === "en" ? branch.name_en : branch.name_zh);
 
-  if (loadingAuth || !user) return <main className="admin-loading">{t("admin.loading")}</main>;
-  if (isSettings && user.role === "librarian") return <Navigate to="/admin" replace />;
-
-  const pageTitle = isSettings && user.role === "librarian" ? t("admin.nav.overview") : t(`admin.nav.${key}`, { defaultValue: t("admin.nav.overview") });
-  const displayName = i18n.language === "zh-CN" ? user.name : user.account;
+  const commands = useMemo<Command[]>(() => [
+    ...nav.map((item) => ({ id: `go-${item.key}`, group: t("admin.palette.pages"), label: t(`admin.nav.${item.key}`), hint: item.path ? `/admin/${item.path}` : "/admin", run: () => navigate(item.path ? `/admin/${item.path}` : "/admin") })),
+    { id: "go-wallboard", group: t("admin.palette.pages"), label: t("admin.nav.wallboard"), hint: "/admin/wallboard", run: () => navigate("/admin/wallboard") },
+    { id: "theme", group: t("admin.palette.actions"), label: theme === "dark" ? t("admin.palette.light") : t("admin.palette.dark"), run: () => setTheme((value) => (value === "dark" ? "light" : "dark")) },
+    { id: "lang", group: t("admin.palette.actions"), label: t("admin.palette.lang"), run: () => void i18n.changeLanguage(i18n.language === "en" ? "zh-CN" : "en") },
+    { id: "logout", group: t("admin.palette.actions"), label: t("admin.logout"), run: () => void signOut() }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  ], [nav.length, theme, i18n.language, t]);
 
   return (
-    <div className={`admin-app ${collapsed ? "is-collapsed" : ""}`} data-theme={theme}>
-      <aside className="admin-sidebar">
+    <AdminContext.Provider value={context}>
+    <div className="admin-app" data-theme={theme}>
+      <aside className="admin-sidebar" aria-label={t("admin.navigation")}>
         <div className="admin-brand">
-          <Logo />
-          <div className="admin-brand-copy"><strong>{t("app.name")}</strong><span>{t("admin.console")}</span></div>
+          <b>{t("app.name")}</b>
+          <span>{t("admin.console")}</span>
         </div>
-        <nav className="admin-nav" aria-label={t("admin.navigation")}>
-          {visibleGroups.map((group) => (
-            <div className="admin-nav-group" key={group.key}>
-              <p>{t(`admin.group.${group.key}`)}</p>
-              {group.items.map((item) => (
-                <button className={key === item.key ? "is-active" : ""} key={item.key} onClick={() => go(item.key)} title={collapsed ? t(`admin.nav.${item.key}`) : undefined}>
-                  <span className="admin-nav-icon" aria-hidden="true">{item.icon}</span>
-                  <span>{t(`admin.nav.${item.key}`)}</span>
-                  {item.key === "alerts" && alertCount > 0 ? <em>{alertCount}</em> : null}
-                </button>
-              ))}
-            </div>
+        <nav>
+          {nav.map((item) => (
+            <NavLink key={item.key} to={item.path ? `/admin/${item.path}` : "/admin"} end={item.path === ""} className="admin-drawer-link">
+              <span className="admin-drawer-plate mono" aria-hidden="true">{item.plate}</span>
+              <span>{t(`admin.nav.${item.key}`)}</span>
+              <i aria-hidden="true" />
+            </NavLink>
           ))}
         </nav>
-        <button className="admin-collapse" onClick={() => setCollapsed((value) => !value)} aria-label={t("admin.collapse")}>
-          <span>{collapsed ? "»" : "«"}</span><span>{t("admin.collapse")}</span>
-        </button>
+        <NavLink to="/admin/wallboard" className="admin-drawer-link admin-wallboard-link">
+          <span className="admin-drawer-plate mono" aria-hidden="true">WB</span>
+          <span>{t("admin.nav.wallboard")}</span>
+          <i aria-hidden="true" />
+        </NavLink>
+        <div className="admin-sidebar-user">
+          <span className="admin-avatar" aria-hidden="true">{user.name.slice(0, 1)}</span>
+          <div>
+            <b>{user.name}</b>
+            <small>{t(`admin.role.${user.role}`)}</small>
+          </div>
+        </div>
       </aside>
 
       <div className="admin-main">
         <header className="admin-topbar">
-          <div className="admin-topbar-left">
-            <label className="admin-branch-select" htmlFor="admin-branch">
-              <span>{t("admin.branch")}</span>
-              <select id="admin-branch" value={branchId} onChange={(event) => setBranchId(event.target.value)}>
-                <option value="all">{t("admin.allBranches")}</option>
-                {branches.map((branch) => <option key={branch.id} value={branch.id}>{i18n.language === "zh-CN" ? branch.name_zh : branch.name_en}</option>)}
-              </select>
-              <ChevronIcon />
-            </label>
-            <button className="admin-search-trigger" onClick={() => setSearchOpen(true)}>
-              <span className="admin-search-glyph">⌕</span><span>{t("admin.search")}</span><kbd>Ctrl K</kbd>
+          <b className="admin-topbar-title">{t(`admin.nav.${current.key}`)}</b>
+          <label className="admin-branch">
+            <span className="qa-sr-only">{t("admin.branch")}</span>
+            <select value={branchId} onChange={(event) => setBranchId(event.target.value)}>
+              <option value="all">{t("admin.allBranches")}</option>
+              {branches.map((branch) => <option key={branch.id} value={branch.id}>{branchName(branch)}</option>)}
+            </select>
+          </label>
+          <button type="button" className="admin-search-trigger" onClick={() => setPaletteOpen(true)}>
+            <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="9" cy="9" r="6" /><path d="M14 14l4 4" /></svg>
+            <span>{t("admin.search")}</span>
+            <kbd>Ctrl K</kbd>
+          </button>
+          <div className="admin-bell-wrap" ref={bellRef}>
+            <button
+              type="button"
+              className="admin-bell"
+              aria-label={t("admin.alerts.label", { count: alerts.length })}
+              aria-expanded={bellOpen}
+              onClick={() => setBellOpen((value) => !value)}
+            >
+              <BellIcon key={ring} className={ring ? "is-ringing" : undefined} />
+              {alerts.length ? <em className="mono">{alerts.length > 99 ? "99+" : alerts.length}</em> : null}
             </button>
+            {bellOpen ? (
+              <div className="admin-bell-panel" role="region" aria-label={t("admin.alerts.title")}>
+                <h3>{t("admin.alerts.title")}</h3>
+                {alerts.length ? (
+                  <ul>
+                    {alerts.slice(0, 6).map((alert) => (
+                      <li key={alert.id}>
+                        <StatusBadge tone={alert.severity === "critical" ? "danger" : alert.severity === "warning" ? "warn" : "info"} label={t(`admin.severity.${alert.severity}`)} />
+                        <span>{alert.message}</span>
+                        <time className="mono">{formatDate(alert.created_at)}</time>
+                      </li>
+                    ))}
+                  </ul>
+                ) : <p>{t("admin.overview.noAlerts")}</p>}
+                <NavLink className="admin-bell-all" to="/admin/alerts" onClick={() => setBellOpen(false)}>{t("admin.alerts.viewAll")} →</NavLink>
+              </div>
+            ) : null}
           </div>
-          <div className="admin-topbar-actions">
-            <button className="admin-icon-button" onClick={() => go("alerts")} aria-label={t("admin.alerts")}>
-              <BellIcon />
-              {alertCount > 0 ? <span>{alertCount}</span> : null}
-            </button>
+          <div className="admin-topbar-controls">
             <LangSwitch />
-            <SegmentedControl items={[t("theme.light"), t("theme.dark")]} value={theme === "light" ? t("theme.light") : t("theme.dark")} onChange={(label) => setTheme(label === t("theme.dark") ? "dark" : "light")} />
-            <div className="admin-user-wrap">
-              <button className="admin-user-button" onClick={() => setUserMenuOpen((value) => !value)}>
-                <span className="admin-avatar">{displayName.slice(0, 1)}</span>
-                <span><strong>{displayName}</strong><small>{t(`admin.role.${user.role}`)}</small></span>
-                <ChevronIcon />
-              </button>
-              {userMenuOpen ? <div className="admin-user-menu"><button onClick={() => void logout()}>{t("admin.logout")}</button></div> : null}
-            </div>
+            <SegmentedControl
+              label={t("theme.label")}
+              items={[t("theme.light"), t("theme.dark")]}
+              value={theme === "dark" ? t("theme.dark") : t("theme.light")}
+              onChange={(label) => setTheme(label === t("theme.dark") ? "dark" : "light")}
+            />
+            <Button variant="ghost" onClick={() => void signOut()}>{t("admin.logout")}</Button>
           </div>
         </header>
 
         <main className="admin-content">
-          <div className="admin-breadcrumbs"><button onClick={() => go("overview")}>{t("admin.nav.overview")}</button><span>/</span><strong>{pageTitle}</strong></div>
-          {key === "overview" ? <OverviewPage overview={overview} t={t} /> : <PlaceholderPage title={pageTitle} t={t} />}
+          <Routes>
+            <Route index element={<OverviewPage branchId={branchId} refreshKey={refreshKey} />} />
+            <Route path="books" element={<BooksPage branchId={branchId} />} />
+            <Route path="readers" element={<ReadersPage />} />
+            <Route path="circulation" element={<CirculationPage branchId={branchId} />} />
+            <Route path="settings" element={<Navigate to="/admin/settings/rules" replace />} />
+            <Route path="settings/rules" element={<RequireRole user={user} roles={["admin"]}><RulesPage /></RequireRole>} />
+            <Route path="devices" element={<DevicesPage />} />
+            <Route path="alerts" element={<AlertsPage />} />
+            <Route path="maintenance" element={<MaintenancePage />} />
+            <Route path="telemetry" element={<Suspense fallback={<div className="admin-telemetry-chart is-loading"><Skeleton lines={6} /></div>}><TelemetryPage /></Suspense>} />
+            <Route path="trace" element={<TracePage />} />
+            <Route path="exports" element={<ExportsPage />} />
+            <Route path="settings/simulator" element={<RequireRole user={user} roles={["admin"]}><SimulatorPage /></RequireRole>} />
+            <Route path="*" element={<Navigate to="/admin" replace />} />
+          </Routes>
         </main>
       </div>
 
-      {searchOpen ? <div className="admin-overlay" onMouseDown={() => setSearchOpen(false)}>
-        <section className="admin-command-palette" role="dialog" aria-modal="true" aria-label={t("admin.commandPalette")} onMouseDown={(event) => event.stopPropagation()}>
-          <div className="admin-command-heading"><strong>{t("admin.commandPalette")}</strong><button onClick={() => setSearchOpen(false)} aria-label={t("admin.close")}><CloseIcon /></button></div>
-          <input autoFocus value={search} onChange={(event) => setSearch(event.target.value)} placeholder={t("admin.searchPlaceholder")} />
-          <div className="admin-command-list">{searchResults.length ? searchResults.map((item) => <button key={item.key} onClick={() => go(item.key)}><span>{item.icon}</span>{t(`admin.nav.${item.key}`)}<small>↵</small></button>) : <p>{t("admin.noResults")}</p>}</div>
-          <footer><span>{t("admin.navigate")}</span><kbd>Esc</kbd><span>{t("admin.close")}</span></footer>
-        </section>
-      </div> : null}
+      <CommandPalette
+        open={paletteOpen}
+        onClose={() => setPaletteOpen(false)}
+        commands={commands}
+        searchCommand={(text) => ({ id: "search-books", group: t("admin.palette.search"), label: t("admin.palette.searchBooks", { text }), run: () => navigate(`/admin/books?q=${encodeURIComponent(text)}`) })}
+      />
     </div>
+    </AdminContext.Provider>
   );
-}
-
-function OverviewPage({ overview, t }: { overview: Overview | null; t: (key: string) => string }) {
-  const cards = [
-    ["branches", "admin.kpi.branches", "admin.kpi.branchesHint"],
-    ["books", "admin.kpi.books", "admin.kpi.booksHint"],
-    ["activeLoans", "admin.kpi.activeLoans", "admin.kpi.activeLoansHint"],
-    ["openAlerts", "admin.kpi.openAlerts", "admin.kpi.openAlertsHint"]
-  ] as const;
-  return (
-    <section className="admin-overview">
-      <div className="admin-page-heading"><div><p>{t("admin.eyebrow")}</p><h1>{t("admin.overviewTitle")}</h1><span>{t("admin.overviewSubtitle")}</span></div><span className="admin-live-mark"><i />{t("admin.live")}</span></div>
-      <div className="admin-kpi-grid">
-        {cards.map(([field, label, hint]) => <article className="admin-kpi-card" key={field}><span>{t(label)}</span><strong>{overview ? overview[field] : "—"}</strong><small>{t(hint)}</small></article>)}
-      </div>
-      <div className="admin-overview-note"><InfoIcon /><div><strong>{t("admin.overviewNoteTitle")}</strong><p>{t("admin.overviewNote")}</p></div></div>
-    </section>
-  );
-}
-
-function PlaceholderPage({ title, t }: { title: string; t: (key: string) => string }) {
-  return <section className="admin-placeholder"><div className="admin-placeholder-spines" aria-hidden="true"><span /><span /><span /><span /><span /></div><h1>{title}</h1><p>{t("admin.placeholder")}</p></section>;
 }

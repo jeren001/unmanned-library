@@ -18,6 +18,9 @@ export type Book = {
   branch_id: string;
   shelf_location: string;
   cover_color: string;
+  category?: string;
+  /** Not served by the API yet; requested in docs/API_REQUESTS.md. */
+  call_number?: string;
   status: "on_shelf" | "borrowed" | "lost" | "repair";
 };
 
@@ -38,7 +41,7 @@ export type KioskResult = {
   kind: "success" | "offline" | "warning";
   title: string;
   detail: string;
-  items?: Array<{ title: string; dueAt?: string; shelf?: string }>;
+  items?: Array<{ title: string; dueAt?: string; shelf?: string; overdueDays?: number; fineCents?: number }>;
   queuedCount?: number;
 };
 

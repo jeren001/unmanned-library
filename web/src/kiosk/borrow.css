@@ -1,0 +1,409 @@
+/* Kiosk borrow flow — tray, catalogue drawer, receipt. Selectors are prefixed with .kiosk-page
+   because page CSS loads before the shared component CSS. */
+
+.kiosk-page .kiosk-borrow {
+  gap: 18px;
+}
+
+/* ---------- Stepper (kiosk size) ---------- */
+
+.kiosk-page .kiosk-borrow-stepper .qa-stepper li {
+  min-height: 52px;
+  padding: 8px 22px 8px 8px;
+  font-size: 18px;
+}
+
+.kiosk-page .kiosk-borrow-stepper .qa-stepper span {
+  width: 34px;
+  height: 34px;
+  font-size: 16px;
+}
+
+/* ---------- Step 1: tray ---------- */
+
+.kiosk-borrow-tray {
+  display: grid;
+  grid-template-columns: minmax(220px, 300px) minmax(0, 1fr);
+  gap: 24px;
+  align-items: center;
+}
+
+.kiosk-borrow-tray-bed {
+  position: relative;
+  height: 220px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border: 2px dashed var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+}
+
+.kiosk-borrow-book {
+  position: relative;
+  z-index: 1;
+  width: 78px;
+  height: 108px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-left: 10px solid rgba(35, 24, 21, .28);
+  border-radius: 3px 6px 6px 3px;
+  background: var(--burgundy);
+  color: var(--cream);
+  font-family: var(--font-serif);
+  font-size: 16px;
+  letter-spacing: .2em;
+  writing-mode: vertical-rl;
+  overflow: hidden;
+  opacity: .35;
+  transition: opacity 400ms ease-out;
+}
+
+.kiosk-borrow-book.is-placed {
+  opacity: 1;
+}
+
+/* A transparent layer spanning the scan area; its top edge carries the line. Moving the
+   layer with transform keeps the sweep on the compositor (animating `top` re-laid out the tray). */
+.kiosk-borrow-scanline {
+  position: absolute;
+  z-index: 2;
+  left: 0;
+  right: 0;
+  top: 4%;
+  height: 90%;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.kiosk-borrow-scanline::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 3px;
+  background: var(--rose);
+  box-shadow: 0 0 12px var(--rose);
+}
+
+.kiosk-borrow-tray.is-reading .kiosk-borrow-scanline {
+  opacity: 1;
+  animation: kiosk-borrow-scan .8s ease-in-out infinite alternate;
+}
+
+@keyframes kiosk-borrow-scan {
+  from { transform: translateY(0); }
+  to { transform: translateY(100%); }
+}
+
+.kiosk-borrow-ring {
+  position: absolute;
+  left: calc(50% - 30px);
+  top: calc(50% - 30px);
+  width: 60px;
+  height: 60px;
+  border: 3px solid var(--rose);
+  border-radius: 50%;
+  opacity: 0;
+}
+
+.kiosk-borrow-tray.is-reading .kiosk-borrow-ring {
+  animation: kiosk-borrow-ring 1.1s ease-out infinite;
+}
+
+.kiosk-borrow-tray.is-reading .kiosk-borrow-ring:nth-child(2) { animation-delay: .2s; }
+.kiosk-borrow-tray.is-reading .kiosk-borrow-ring:nth-child(3) { animation-delay: .4s; }
+
+@keyframes kiosk-borrow-ring {
+  from { transform: scale(.5); opacity: .8; }
+  to { transform: scale(3.2); opacity: 0; }
+}
+
+.kiosk-borrow-tray-copy h2 {
+  margin: 0 0 6px;
+  font-size: 30px;
+  color: var(--accent);
+}
+
+.kiosk-borrow-tray-copy > p {
+  margin: 0 0 16px;
+  color: var(--text-2);
+  font-size: 17px;
+}
+
+.kiosk-page .kiosk-borrow-reading {
+  min-height: 26px;
+  margin: 10px 0 0;
+  color: var(--accent);
+  font-size: 17px;
+  font-weight: 600;
+}
+
+/* Unavailable (already borrowed / repair) books keep the card shape with a rose spine. */
+.kiosk-page .kiosk-book-card.is-unavailable {
+  border-color: color-mix(in srgb, var(--danger) 40%, var(--line));
+  background: var(--status-overdue-bg);
+}
+
+.kiosk-page .kiosk-book-card.is-unavailable .kiosk-spine {
+  background: var(--rose);
+}
+
+.kiosk-page .kiosk-book-card.is-unavailable .qa-badge {
+  justify-self: start;
+}
+
+/* ---------- Step 2: catalogue drawer ---------- */
+
+.kiosk-page .kiosk-borrow-drawer {
+  max-width: 640px;
+}
+
+.kiosk-borrow-cards {
+  display: grid;
+  gap: 10px;
+}
+
+.kiosk-page .kiosk-borrow-cards .qa-catalog-card h3 {
+  font-size: 28px;
+}
+
+.kiosk-page .kiosk-borrow-cards .qa-catalog-card dl {
+  grid-template-columns: 130px 1fr;
+  font-size: 17px;
+}
+
+.kiosk-page .kiosk-borrow-due {
+  margin-top: 4px;
+}
+
+.kiosk-page .kiosk-borrow-due dd {
+  color: var(--accent);
+}
+
+.kiosk-page .kiosk-borrow-limit-note {
+  margin: 10px 0 0;
+  color: var(--text-2);
+  font-size: 15px;
+}
+
+/* ---------- Loan limit strip & errors ---------- */
+
+.kiosk-borrow-limit {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 20px;
+  color: var(--text-2);
+  font-size: 16px;
+}
+
+.kiosk-borrow-limit b {
+  color: var(--text);
+  font-family: var(--font-mono);
+}
+
+.kiosk-borrow-limit strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--danger);
+}
+
+.kiosk-borrow-limit svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* ---------- Step 3: receipt ---------- */
+
+.kiosk-page .kiosk-borrow-result {
+  width: min(100%, 1050px);
+  position: relative;
+  overflow: hidden;
+  justify-items: stretch;
+}
+
+.kiosk-page .kiosk-borrow-ribbon {
+  right: clamp(24px, 8vw, 96px);
+}
+
+.kiosk-borrow-receipt {
+  display: grid;
+  grid-template-columns: minmax(240px, 320px) minmax(0, 1fr);
+  gap: clamp(20px, 4vw, 48px);
+  align-items: start;
+  margin-top: 18px;
+  text-align: left;
+}
+
+.kiosk-borrow-printer {
+  position: relative;
+}
+
+.kiosk-borrow-printer-mouth {
+  position: relative;
+  z-index: 2;
+  display: block;
+  height: 22px;
+  border-radius: 11px;
+  background: var(--burgundy-deep);
+}
+
+.kiosk-borrow-paper {
+  margin: -8px 14px 0;
+  overflow: hidden;
+}
+
+.kiosk-borrow-slip {
+  position: relative;
+  border: 1px solid var(--line);
+  border-top: 0;
+  border-radius: 0 0 12px 12px;
+  background: #FFFFFF;
+  color: var(--ink);
+  padding: 18px 16px 16px;
+  font-size: 15px;
+}
+
+.kiosk-borrow-slip header {
+  display: grid;
+  gap: 2px;
+  padding-bottom: 8px;
+  border-bottom: 1px dashed var(--line);
+}
+
+.kiosk-borrow-slip header b {
+  font-family: var(--font-serif);
+  font-size: 20px;
+  color: var(--burgundy);
+}
+
+.kiosk-borrow-slip header span {
+  font-size: 12px;
+  color: #6B5F52;
+}
+
+.kiosk-borrow-slip ul {
+  margin: 0;
+  padding: 6px 0;
+  list-style: none;
+}
+
+.kiosk-borrow-slip li {
+  display: grid;
+  gap: 2px;
+  padding: 6px 0;
+  border-bottom: 1px dashed var(--line);
+}
+
+.kiosk-borrow-slip li .mono {
+  font-size: 13px;
+}
+
+.kiosk-borrow-slip footer {
+  padding: 10px 70px 0 0;
+  color: #6B5F52;
+  font-size: 13px;
+}
+
+.kiosk-borrow-stamp {
+  position: absolute;
+  right: 12px;
+  bottom: 18px;
+  width: 82px;
+  height: 82px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 3px double var(--rose);
+  border-radius: 50%;
+  color: var(--rose);
+  font-family: var(--font-serif);
+  font-size: 18px;
+  font-weight: 700;
+  opacity: .9;
+  transform: rotate(-14deg);
+}
+
+.kiosk-borrow-stamp.is-queued {
+  border-color: var(--wood);
+  color: var(--wood);
+}
+
+.kiosk-borrow-summary {
+  display: grid;
+  justify-items: start;
+  gap: 12px;
+}
+
+.kiosk-page .kiosk-borrow-summary .kiosk-result-mark {
+  width: 72px;
+  height: 72px;
+}
+
+.kiosk-page .kiosk-borrow-summary h1,
+.kiosk-page .kiosk-borrow-summary > p {
+  margin: 0;
+  text-align: left;
+}
+
+.kiosk-borrow-count {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  padding: 12px 18px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 400ms ease-out, transform 400ms ease-out;
+}
+
+.kiosk-borrow-count.is-on {
+  opacity: 1;
+  transform: none;
+}
+
+.kiosk-borrow-count span {
+  color: var(--text-2);
+  font-size: 17px;
+}
+
+.kiosk-borrow-count b {
+  min-width: 2ch;
+  font-family: var(--font-serif);
+  font-size: 40px;
+  line-height: 1;
+  color: var(--accent);
+}
+
+@media (orientation: portrait) and (min-height: 1200px) {
+  .kiosk-borrow-tray {
+    grid-template-columns: 1fr;
+    gap: 28px;
+  }
+
+  .kiosk-borrow-tray-bed {
+    height: 460px;
+  }
+}
+
+@media (max-width: 760px) {
+  .kiosk-borrow-tray,
+  .kiosk-borrow-receipt {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kiosk-borrow-tray.is-reading .kiosk-borrow-scanline,
+  .kiosk-borrow-tray.is-reading .kiosk-borrow-ring {
+    animation: none;
+  }
+
+  .kiosk-borrow-tray.is-reading .kiosk-borrow-ring:first-child {
+    opacity: .6;
+  }
+}
