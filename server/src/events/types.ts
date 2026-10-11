@@ -87,6 +87,18 @@ export type KpiUpdatedEvent = {
   ts: string;
 };
 
+export type SimulatorLogEvent = {
+  action: "start" | "stop" | "speed" | "scenario";
+  status: "started" | "stopped" | "updated" | "queued" | "completed" | "failed";
+  branchId?: string | null;
+  scenario?: string;
+  speed?: number;
+  intervalMs?: number;
+  message: string;
+  details?: Record<string, unknown>;
+  ts: string;
+};
+
 export type EventMap = {
   "telemetry.received": TelemetryReceivedEvent;
   "circulation.borrowed": CirculationEvent;
@@ -99,6 +111,7 @@ export type EventMap = {
   "alert.noted": AlertEvent;
   "device.status_changed": DeviceStatusChangedEvent;
   "kpi.updated": KpiUpdatedEvent;
+  "simulator.log": SimulatorLogEvent;
 };
 
 export type EventName = keyof EventMap;
@@ -120,7 +133,8 @@ export const EVENT_NAMES: EventName[] = [
   "alert.resolved",
   "alert.noted",
   "device.status_changed",
-  "kpi.updated"
+  "kpi.updated",
+  "simulator.log"
 ];
 
 export function isEventName(value: string): value is EventName {

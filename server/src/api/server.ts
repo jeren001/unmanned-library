@@ -1,4 +1,4 @@
-import express from "express";
+import express, { type NextFunction, type Request, type Response } from "express";
 import { createAuthRouter, requireAuth } from "./auth.js";
 import { healthRouter } from "./health.js";
 import { createLibraryRouter } from "./library.js";
@@ -42,14 +42,35 @@ export function createServer(filename?: string) {
   app.use("/api/auth", createAuthRouter(persistence.repo));
   app.use("/api/health", healthRouter);
   app.get("/api/stream", requireAuth("librarian", "admin"), (req, res) => streamEvents(req, res, bus));
-  app.get("/api/simulator/status", requireAuth("librarian", "admin"), (_req, res) => res.json({ data: simulator.status() }));
-  app.post("/api/simulator", requireAuth("librarian", "admin"), (req, res) => {
+  app.get("/api/simulator/status", requireAuth("admin"), (_req, res) => res.json({ data: simulator.status() }));
+  app.post("/api/simulator/start", requireAuth("admin"), (req, res) => {
+    if (req.body?.speed !== undefined && typeof req.body.speed !== "number") return res.status(400).json({ code: "INVALID_SPEED", message: "speed must be a number" });
+    try {
+      res.json({ data: simulator.startControl(typeof req.body?.speed === "number" ? req.body.speed : undefined) });
+    } catch (error) {
+      res.status(400).json({ code: "INVALID_SPEED", message: error instanceof Error ? error.message : "Invalid speed" });
+    }
+  });
+  app.post("/api/simulator/stop", requireAuth("admin"), (_req, res) => {
+    void simulator.stop().then(() => res.json({ data: simulator.status() }));
+  });
+  app.patch("/api/simulator/speed", requireAuth("admin"), (req, res) => {
+    if (typeof req.body?.speed !== "number") return res.status(400).json({ code: "INVALID_SPEED" });
+    try {
+      res.json({ data: simulator.setSpeed(req.body.speed) });
+    } catch (error) {
+      res.status(400).json({ code: "INVALID_SPEED", message: error instanceof Error ? error.message : "Invalid speed" });
+    }
+  });
+  app.post("/api/simulator", requireAuth("admin"), (req, res) => {
     if (typeof req.body?.enabled !== "boolean") return res.status(400).json({ code: "INVALID_ENABLED" });
     res.json({ data: simulator.setEnabled(req.body.enabled) });
   });
-  app.post("/api/simulator/scenario", requireAuth("librarian", "admin"), (req, res) => {
+  app.post("/api/simulator/scenario", requireAuth("admin"), (req, res) => {
     const allowed = ["smoke_spike", "device_offline", "illegal_exit", "sensor_glitch", "network_outage", "overload", "recover"];
     if (!allowed.includes(req.body?.scenario)) return res.status(400).json({ code: "INVALID_SCENARIO" });
+    const branchId = req.body?.branchId;
+    if (branchId !== undefined && (typeof branchId !== "string" || branchId.trim() === "" || branchId.length > 128)) return res.status(400).json({ code: "INVALID_INPUT", message: "branchId must be a non-empty string.", details: null });
     void simulator.scenario(req.body.scenario, req.body.branchId)
       .then((data) => res.status(202).json({ data }))
       .catch((error: unknown) => res.status(400).json({ code: "SCENARIO_FAILED", message: error instanceof Error ? error.message : "Scenario failed" }));
@@ -59,12 +80,23 @@ export function createServer(filename?: string) {
     loansToday: persistence.repo.count("loans", "borrowed_at >= date('now') AND status IN ('active','returned','overdue')")
   })));
   app.use("/api", createLibraryRouter(services, { telemetryPipeline }));
+  // Malformed JSON bodies get the same error shape as schema failures instead of Express's HTML page.
+  app.use((error: unknown, _req: Request, res: Response, next: NextFunction) => {
+    if (res.headersSent) return next(error);
+    const type = (error as { type?: string } | null)?.type;
+    if (type === "entity.parse.failed" || type === "entity.too.large") {
+      res.status(type === "entity.too.large" ? 413 : 400).json({ code: "INVALID_INPUT", message: "Request body is invalid.", details: null });
+      return;
+    }
+    res.status(500).json({ code: "INTERNAL_ERROR", message: "The server could not complete the request.", details: null });
+  });
 
   app.locals.persistence = persistence;
   app.locals.services = services;
   app.locals.events = bus;
   app.locals.simulator = simulator;
   app.locals.alertRules = rules;
+  app.locals.telemetryPipeline = telemetryPipeline;
   if (process.env.SIMULATOR_ENABLED !== "false") simulator.start();
 
   return app;

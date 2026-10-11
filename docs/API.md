@@ -11,6 +11,16 @@ show representative JSON; generated IDs, timestamps, and counts vary.
   `reader/librarian/admin`; `manage` means `librarian/admin`.
 - Most successful domain responses are wrapped as `{ "data": ... }`.
 - Status values: `implemented`, `partial`, `missing`.
+- Personal data is masked in every response and export: `password_hash` is never
+  returned; `email` keeps the first character and the domain (`r***@library.local`);
+  `card_no`, `student_no`, and `qr_code` keep only the last 4 characters
+  (`****0001`). `id_number_masked` is stored masked. Audit entries mask card numbers
+  and email-shaped login accounts the same way.
+- `audit_log` is append-only. No route updates or deletes it, and SQLite triggers
+  reject `UPDATE`/`DELETE` on the table (only `npm run seed` clears it).
+- Write bodies are validated: ids are non-empty strings up to 128 characters, text
+  fields have length limits, and timestamps must parse as dates. Unknown fields are
+  rejected on `PATCH` routes.
 
 ## Error Format
 
@@ -47,8 +57,11 @@ Query validation uses code `INVALID_QUERY`. Domain errors use:
 }
 ```
 
-Domain errors ending in `NOT_FOUND` return `404`; other domain errors return
-`409`. Unique constraint failures return:
+Domain errors ending in `NOT_FOUND` return `404`; `FORBIDDEN` (for example a
+reader acting on another reader's loan) returns `403`; other domain errors return
+`409`. A body that is not valid JSON returns `400`
+`{ "code": "INVALID_INPUT", "message": "Request body is invalid.", "details": null }`
+(`413` with the same code when it exceeds 100 kB). Unique constraint failures return:
 
 ```json
 {
@@ -70,7 +83,10 @@ Unexpected route failures return:
 
 Auth routes also use compact errors such as `{ "error": "INVALID_INPUT" }`,
 `{ "error": "RATE_LIMITED", "message": "Too many attempts. Please wait a minute." }`,
-and credential errors that include both `code` and `error`.
+and credential errors that include both `code` and `error`. Login and card login
+share a rate limiter: 12 attempts per minute per IP and account or card number,
+and 30 attempts per minute per IP across all accounts, so rotating card numbers
+cannot bypass it.
 
 ## Endpoints
 
@@ -324,12 +340,12 @@ Unauthenticated response:
       "id": "reader-001",
       "role": "reader",
       "username": "R-2048",
-      "email": "reader.demo@library.local",
+      "email": "r***@library.local",
       "display_name": "林知秋",
-      "student_no": "20240001",
+      "student_no": "****0001",
       "id_number_masked": "3201********1024",
-      "card_no": "20240001",
-      "qr_code": "QR-20240001",
+      "card_no": "****0001",
+      "qr_code": "*******0001",
       "deposit_cents": 10000,
       "status": "active"
     }
@@ -370,7 +386,7 @@ Unauthenticated response:
     "role": "reader",
     "username": "R-2099",
     "display_name": "新读者",
-    "card_no": "20240999",
+    "card_no": "****0999",
     "status": "active"
   }
 }
@@ -381,7 +397,7 @@ Unauthenticated response:
 
 ### `GET /api/readers/:id`
 
-- **Role:** operate
+- **Role:** operate; readers may view only their own record (`403` otherwise)
 - **Request:** no body
 - **Response:**
 
@@ -392,7 +408,7 @@ Unauthenticated response:
     "role": "reader",
     "username": "R-2048",
     "display_name": "林知秋",
-    "card_no": "20240001",
+    "card_no": "****0001",
     "deposit_cents": 10000,
     "status": "active"
   }
@@ -650,6 +666,142 @@ Unauthenticated response:
 ```
 
 - **Errors:** `400 INVALID_INPUT`, `401`, `403`, `409 CONFLICT`, `500 INTERNAL_ERROR`
+- **Status:** implemented
+
+### `GET /api/trace`
+
+- **Role:** manage
+- **Request:** exactly one of:
+  - `GET /api/trace?book=RFID-000001`
+  - `GET /api/trace?book=978-7-100001-1`
+  - `GET /api/trace?book=无人值守系统设计`
+  - `GET /api/trace?loanId=loan-00001`
+  - `GET /api/trace?alertId=alert-001`
+
+- **Response:**
+
+```json
+{
+  "data": {
+    "input": { "book": "RFID-000001" },
+    "window": {
+      "branchId": "branch-east",
+      "from": "2026-10-10T10:00:00.000Z",
+      "to": "2026-10-10T10:30:00.000Z",
+      "source": "loan"
+    },
+    "chain": [
+      {
+        "order": 1,
+        "kind": "book",
+        "ts": "2026-01-01T09:00:00.000Z",
+        "record": {
+          "id": "book-0001",
+          "isbn": "978-7-100001-1",
+          "title": "无人值守系统设计（第 2 版）",
+          "rfid_tag": "RFID-000001",
+          "branch_id": "branch-east"
+        }
+      },
+      {
+        "order": 2,
+        "kind": "rfid_tag",
+        "ts": "2026-10-10T10:00:00.000Z",
+        "record": {
+          "tag": "RFID-000001",
+          "book_id": "book-0001",
+          "branch_id": "branch-east"
+        }
+      },
+      {
+        "order": 3,
+        "kind": "loan_transaction",
+        "ts": "2026-10-10T10:00:00.000Z",
+        "record": {
+          "id": "loan-00001",
+          "book_id": "book-0001",
+          "user_id": "reader-001",
+          "who": {
+            "user_id": "reader-001",
+            "name": "林知秋",
+            "account": "R-2048"
+          },
+          "when": {
+            "borrowed_at": "2026-10-10T10:00:00.000Z",
+            "returned_at": "2026-10-10T10:30:00.000Z",
+            "due_at": "2026-11-09T10:00:00.000Z"
+          }
+        }
+      },
+      {
+        "order": 4,
+        "kind": "device_event",
+        "ts": "2026-10-10T10:00:00.000Z",
+        "record": {
+          "source": "loan",
+          "device_id": "device-east-1",
+          "device_kind": "kiosk",
+          "action": "borrow"
+        }
+      },
+      {
+        "order": 5,
+        "kind": "device_event",
+        "ts": "2026-10-10T10:12:00.000Z",
+        "record": {
+          "id": "gate-001",
+          "device_id": "device-east-3",
+          "direction": "out",
+          "rfid_tags": ["RFID-000001"],
+          "authorized": 1
+        }
+      },
+      {
+        "order": 6,
+        "kind": "camera_clip",
+        "ts": "2026-10-10T09:55:00.000Z",
+        "record": {
+          "id": "clip-001",
+          "device_id": "device-east-4",
+          "file_path": "assets/placeholder.mp4"
+        }
+      },
+      {
+        "order": 7,
+        "kind": "alert",
+        "ts": "2026-10-10T10:15:00.000Z",
+        "record": {
+          "id": "alert-001",
+          "type": "theft",
+          "status": "open",
+          "related_loan_id": "loan-00001",
+          "related_clip_id": "clip-001"
+        }
+      },
+      {
+        "order": 8,
+        "kind": "maintenance",
+        "ts": "2026-10-10T10:20:00.000Z",
+        "record": {
+          "id": "maint-001",
+          "kind": "device_repair",
+          "related_alert_id": "alert-001",
+          "status": "open"
+        }
+      }
+    ]
+  }
+}
+```
+
+The trace resolves a book by exact ID, title, ISBN, or RFID tag, with fuzzy
+title fallback. For a book input, the latest loan is used when available. For a
+loan input, the linked book defines the chain. For an alert input, the alert
+must be linked to a loan. The time window is the loan borrow/return window when
+available; otherwise it falls back to the alert or book timestamps. Camera clips
+overlapping the window are returned, with nearest clip fallback.
+
+- **Errors:** `400 INVALID_QUERY`, `401`, `403`, `404 TRACE_NOT_FOUND`, `500 INTERNAL_ERROR`
 - **Status:** implemented
 
 ### `GET /api/devices`
@@ -1114,30 +1266,191 @@ tags create `theft` alerts linked to the nearest camera clip. Repeated open
 alerts for the same branch, device, and type are de-duplicated for
 `alert_dedup_seconds` or 60 seconds by default.
 
-### `GET /api/telemetry`
+### `GET /api/exports/preview`
 
 - **Role:** manage
-- **Request:** `GET /api/telemetry?branchId=branch-east&metric=temperature&from=2026-10-01T00:00:00.000Z&to=2026-10-10T00:00:00.000Z`
+- **Request:** `GET /api/exports/preview?dataset=loans&branchId=branch-east&from=2026-10-01T00:00:00.000Z&to=2026-10-31T23:59:59.999Z&locale=zh-CN`
+
+Query parameters:
+
+| Parameter | Required | Values | Notes |
+|---|---:|---|---|
+| `dataset` | yes | `loans`, `books`, `readers`, `telemetry`, `alerts`, `maintenance` | Dataset to export. |
+| `locale` | no | `en`, `zh-CN` | Defaults to `en`; controls header labels and sheet names. |
+| `branchId` | no | branch ID | Branch filter. For `readers`, matches readers with loan history in that branch. |
+| `from` | no | ISO timestamp | Inclusive lower bound. Uses `borrowed_at`, `created_at`, `ts`, or `started_at` depending on dataset. |
+| `to` | no | ISO timestamp | Inclusive upper bound. |
+
+- **Response:** first 20 rows only
+
+```json
+{
+  "data": {
+    "dataset": "loans",
+    "locale": "zh-CN",
+    "filters": {
+      "branchId": "branch-east",
+      "from": "2026-10-01T00:00:00.000Z",
+      "to": "2026-10-31T23:59:59.999Z"
+    },
+    "columns": [
+      { "key": "id", "header": "借阅编号", "type": "text" },
+      { "key": "borrowed_at", "header": "借出时间", "type": "date" }
+    ],
+    "rows": [
+      {
+        "id": "loan-00001",
+        "branch_name": "East Campus Library",
+        "book_title": "无人值守系统设计（第 2 版）",
+        "borrowed_at": "2026-10-10T10:00:00.000Z"
+      }
+    ]
+  }
+}
+```
+
+- **Errors:** `400 INVALID_QUERY`, `401`, `403`, `500 INTERNAL_ERROR`
+- **Status:** implemented
+
+### `GET /api/exports/download`
+
+- **Role:** manage
+- **Request:** `GET /api/exports/download?dataset=telemetry&branchId=branch-east&from=2026-10-01T00:00:00.000Z&to=2026-10-10T23:59:59.999Z&locale=en`
+- **Response:** streamed `.xlsx` file with:
+  - one localized data sheet,
+  - one `Summary`/`汇总` sheet,
+  - frozen header rows,
+  - Excel date formats `yyyy-mm-dd hh:mm:ss`,
+  - numeric formats for counts and sensor values.
+
+Each successful call inserts one `export_history` row and writes an audit-log
+entry with action `export_dataset`.
+
+- **Errors:** `400 INVALID_QUERY`, `401`, `403`, `500 INTERNAL_ERROR`
+- **Status:** implemented
+
+### `GET /api/exports/history`
+
+- **Role:** manage
+- **Request:** `GET /api/exports/history?limit=20&offset=0`
 - **Response:**
 
 ```json
 {
   "data": [
     {
-      "id": "tel-EAST-1-temperature",
-      "device_id": "device-east-5",
+      "id": "generated-uuid",
+      "dataset": "telemetry",
+      "locale": "en",
       "branch_id": "branch-east",
-      "metric": "temperature",
-      "value": 23.4,
-      "quality": "ok",
-      "ts": "2026-10-10T09:00:00.000Z"
+      "from_ts": "2026-10-01T00:00:00.000Z",
+      "to_ts": "2026-10-10T23:59:59.999Z",
+      "row_count": 1200,
+      "file_name": "telemetry-2026-10-11T08-00-00-000Z.xlsx",
+      "download_path": "/api/exports/generated-uuid/download",
+      "created_by": "librarian-001",
+      "created_by_name": "馆员",
+      "detail": {
+        "branchId": "branch-east",
+        "from": "2026-10-01T00:00:00.000Z",
+        "to": "2026-10-10T23:59:59.999Z"
+      },
+      "created_at": "2026-10-11T08:00:00.000Z"
     }
   ]
 }
 ```
 
 - **Errors:** `400 INVALID_QUERY`, `401`, `403`, `500 INTERNAL_ERROR`
-- **Status:** partial; raw telemetry query only, no daily curves/export/archive route
+- **Status:** implemented
+
+### `GET /api/exports/:id/download`
+
+- **Role:** manage
+- **Request:** `GET /api/exports/generated-uuid/download`
+- **Response:** streamed `.xlsx` regenerated from the saved history filters.
+
+Each successful call writes an audit-log entry with action `download_export`.
+
+- **Errors:** `401`, `403`, `404 EXPORT_NOT_FOUND`, `500 INTERNAL_ERROR`
+- **Status:** implemented
+
+### `GET /api/telemetry`
+
+- **Role:** manage
+- **Request:** `GET /api/telemetry?branchId=branch-east&metric=temperature&from=2026-10-01T00:00:00.000Z&to=2026-10-10T00:00:00.000Z&aggregate=hourly&mode=cleaned&compareBranchId=branch-west`
+
+Query parameters:
+
+| Parameter | Required | Values | Notes |
+|---|---:|---|---|
+| `branchId` | yes | branch ID | Base branch to query. |
+| `metric` | yes | metric name | For example `temperature`, `humidity`, `smoke_ppm`. |
+| `from` | no | ISO timestamp | Inclusive lower bound. |
+| `to` | no | ISO timestamp | Inclusive upper bound. |
+| `aggregate` | no | `raw`, `hourly`, `daily` | Defaults to `raw`; hourly/daily rows include `avg`, `min`, `max`, and counts. |
+| `mode` | no | `raw`, `cleaned` | Defaults to `raw`; `cleaned` excludes `quality=suspect/dirty` samples from `series` and comparison, but anomalies are still reported from raw data. |
+| `compareBranchId` | no | branch ID | Adds branch-to-branch comparison. If `aggregate=raw`, comparison uses hourly buckets. |
+
+- **Response:**
+
+```json
+{
+  "data": {
+    "branchId": "branch-east",
+    "metric": "temperature",
+    "from": "2026-10-01T00:00:00.000Z",
+    "to": "2026-10-10T00:00:00.000Z",
+    "aggregate": "hourly",
+    "mode": "cleaned",
+    "series": [
+      {
+        "bucket_ts": "2026-10-10T09:00:00.000Z",
+        "avg": 23.4,
+        "min": 22.9,
+        "max": 24.1,
+        "count": 12,
+        "suspect_count": 0,
+        "dirty_count": 0
+      }
+    ],
+    "anomalies": [
+      {
+        "sampleId": "tel-EAST-7-temperature",
+        "branch_id": "branch-east",
+        "device_id": "device-east-5",
+        "metric": "temperature",
+        "value": 999999,
+        "quality": "dirty",
+        "ts": "2026-10-10T11:00:00.000Z",
+        "reasons": ["garbage_after_outage", "out_of_range", "jump"]
+      }
+    ],
+    "comparison": {
+      "baseBranchId": "branch-east",
+      "compareBranchId": "branch-west",
+      "aggregate": "hourly",
+      "points": [
+        {
+          "bucket_ts": "2026-10-10T09:00:00.000Z",
+          "base": { "bucket_ts": "2026-10-10T09:00:00.000Z", "avg": 23.4, "min": 22.9, "max": 24.1, "count": 12, "suspect_count": 0, "dirty_count": 0 },
+          "compare": { "bucket_ts": "2026-10-10T09:00:00.000Z", "avg": 22.1, "min": 21.8, "max": 22.8, "count": 12, "suspect_count": 0, "dirty_count": 0 },
+          "delta_avg": 1.3
+        }
+      ]
+    }
+  }
+}
+```
+
+With `aggregate=raw`, `series` contains raw telemetry rows with `id`,
+`device_id`, `branch_id`, `metric`, `value`, `quality`, and `ts`.
+Anomaly `reasons` are one or more of `jump`, `out_of_range`, `stale`, and
+`garbage_after_outage`. Dirty and suspect data remains stored in `telemetry`;
+the cleaned mode filters it from calculations only.
+
+- **Errors:** `400 INVALID_QUERY`, `401`, `403`, `500 INTERNAL_ERROR`
+- **Status:** implemented
 
 ### `POST /api/telemetry`
 
@@ -1161,6 +1474,31 @@ alerts for the same branch, device, and type are de-duplicated for
 ```
 
 - **Errors:** `400 INVALID_INPUT`, `401`, `403`, `500 INTERNAL_ERROR`
+- **Status:** implemented
+
+### `POST /api/telemetry/archive`
+
+- **Role:** admin
+- **Request:** no body.
+
+Moves raw `telemetry` rows older than two years into `telemetry_archive` in
+one transaction. The cutoff is now minus two years, rounded down to the hour,
+so no hour is split between the two tables. Before rows are moved, the
+`telemetry_hourly` rollups for those hours are refreshed from the raw rows,
+and the rollups stay in place afterwards. Running it again moves `0` rows. Each
+run is written to `audit_log` with action `archive_telemetry`. The same job
+runs from the CLI with `npm run archive` in `/server`.
+
+- **Response:**
+
+```json
+{ "data": { "moved": 12, "cutoff": "2024-10-11T07:00:00.000Z" } }
+```
+
+`GET /api/telemetry` reads only the live `telemetry` table, so archived
+samples no longer appear in its `series` or `anomalies`.
+
+- **Errors:** `401`, `403`, `500 INTERNAL_ERROR`
 - **Status:** implemented
 
 ### `GET /api/maintenance`
@@ -1392,7 +1730,13 @@ Creates an audit-log entry with action `complete_maintenance`. If
 }
 ```
 
-- **Errors:** `400 INVALID_INPUT`, `401`, `403`, `500 INTERNAL_ERROR`
+`value` is validated per key: `loan_days` integer 1–365, `max_loans` 1–100,
+`max_renewals` 0–20, `fine_per_day_cents` 0–100000, `overdue_grace_days` 0–365,
+`alert_thresholds` an object of `{ "min"?: number, "max"?: number }` per metric with
+`min <= max`. `description` is required (1–200 characters). Other keys return
+`404 RULE_NOT_FOUND`.
+
+- **Errors:** `400 INVALID_INPUT`, `401`, `403`, `404 RULE_NOT_FOUND`, `500 INTERNAL_ERROR`
 - **Status:** implemented
 
 ### `GET /api/branches`
@@ -1445,7 +1789,7 @@ Creates an audit-log entry with action `complete_maintenance`. If
 ### `GET /api/stream`
 
 - **Role:** manage
-- **Request:** `GET /api/stream?branchId=branch-east&topics=telemetry.received,alert.raised`;
+- **Request:** `GET /api/stream?branchId=branch-east&topics=telemetry.received,alert.raised,simulator.log`;
   optional `Last-Event-ID` header or `after` query parameter
 - **Response:** `text/event-stream`
 
@@ -1461,7 +1805,7 @@ Heartbeat comments use `: keepalive 1728554400000`.
 
 ### `GET /api/simulator/status`
 
-- **Role:** manage
+- **Role:** admin
 - **Request:** no body
 - **Response:**
 
@@ -1470,6 +1814,8 @@ Heartbeat comments use `: keepalive 1728554400000`.
   "data": {
     "enabled": true,
     "running": true,
+    "speed": 1,
+    "intervalMs": 5000,
     "queued": 0,
     "scenarios": {}
   }
@@ -1479,13 +1825,13 @@ Heartbeat comments use `: keepalive 1728554400000`.
 - **Errors:** `401`, `403`, `500 INTERNAL_ERROR`
 - **Status:** implemented
 
-### `POST /api/simulator`
+### `POST /api/simulator/start`
 
-- **Role:** manage
+- **Role:** admin
 - **Request:**
 
 ```json
-{ "enabled": false }
+{ "speed": 2 }
 ```
 
 - **Response:**
@@ -1493,20 +1839,88 @@ Heartbeat comments use `: keepalive 1728554400000`.
 ```json
 {
   "data": {
-    "enabled": false,
-    "running": false,
+    "enabled": true,
+    "running": true,
+    "speed": 2,
+    "intervalMs": 2500,
     "queued": 0,
     "scenarios": {}
   }
 }
 ```
 
+`speed` is optional; when present it must be a positive number (values above `100` are clamped).
+
+- **Errors:** `400 INVALID_SPEED`, `401`, `403`
+- **Status:** implemented
+
+### `POST /api/simulator/stop`
+
+- **Role:** admin
+- **Request:** no body
+- **Response:**
+
+```json
+{
+  "data": {
+    "enabled": true,
+    "running": false,
+    "speed": 2,
+    "intervalMs": 2500,
+    "queued": 0,
+    "scenarios": {}
+  }
+}
+```
+
+- **Errors:** `401`, `403`
+- **Status:** implemented
+
+### `PATCH /api/simulator/speed`
+
+- **Role:** admin
+- **Request:**
+
+```json
+{ "speed": 4 }
+```
+
+- **Response:**
+
+```json
+{
+  "data": {
+    "enabled": true,
+    "running": true,
+    "speed": 4,
+    "intervalMs": 1250,
+    "queued": 0
+  }
+}
+```
+
+- **Errors:** `400 INVALID_SPEED`, `401`, `403`
+- **Status:** implemented
+
+`speed` is a positive multiplier clamped to `0.1` through `100`. The effective
+simulation tick interval is the configured base interval divided by `speed`.
+
+### `POST /api/simulator`
+
+- **Role:** admin
+- **Request:** legacy toggle shape retained for compatibility
+
+```json
+{ "enabled": false }
+```
+
+- **Response:** simulator status object
 - **Errors:** `400 { "code": "INVALID_ENABLED" }`, `401`, `403`
 - **Status:** implemented
 
 ### `POST /api/simulator/scenario`
 
-- **Role:** manage
+- **Role:** admin
 - **Request:**
 
 ```json
@@ -1520,12 +1934,19 @@ Heartbeat comments use `: keepalive 1728554400000`.
   "data": {
     "scenario": "smoke_spike",
     "branchId": "branch-east",
+    "alerts": [
+      {
+        "type": "smoke",
+        "severity": "critical",
+        "status": "open"
+      }
+    ],
     "queued": 0
   }
 }
 ```
 
-- **Errors:** `400 { "code": "INVALID_SCENARIO" }`, `400 SCENARIO_FAILED`, `401`, `403`
+- **Errors:** `400 { "code": "INVALID_SCENARIO" }`, `400 INVALID_INPUT` (non-string `branchId`), `400 SCENARIO_FAILED`, `401`, `403`
 - **Status:** implemented
 
 ## SSE Events
@@ -1543,6 +1964,7 @@ Heartbeat comments use `: keepalive 1728554400000`.
 | `alert.noted` | `{ "alertId": "alert-001", "branchId": "branch-east", "deviceId": "device-east-7", "type": "smoke", "severity": "critical", "message": "Checked camera clip.", "status": "acked", "actorId": "librarian-001", "ts": "2026-10-10T10:02:00.000Z" }` |
 | `device.status_changed` | `{ "deviceId": "device-east-1", "branchId": "branch-east", "name": "East kiosk", "kind": "kiosk", "from": "online", "to": "offline", "reason": "scenario", "ts": "2026-10-10T10:00:00.000Z", "lastSeenAt": null, "missedIntervals": 3 }` |
 | `kpi.updated` | `{ "branchId": "branch-east", "stats": { "branches": 3, "books": 300, "readers": 60, "devicesOnline": 24, "devicesTotal": 30, "activeLoans": 30, "openAlerts": 12 }, "ts": "2026-10-10T10:00:00.000Z" }` |
+| `simulator.log` | `{ "action": "scenario", "status": "completed", "branchId": "branch-east", "scenario": "smoke_spike", "speed": 2, "intervalMs": 2500, "message": "Scenario completed: smoke_spike", "details": { "scenario": "smoke_spike", "branchId": "branch-east" }, "ts": "2026-10-10T10:00:00.000Z" }` |
 
 ## Simulator Scenarios
 
@@ -1551,21 +1973,27 @@ The simulator starts unless `SIMULATOR_ENABLED=false`. It uses
 
 | Scenario | Behavior |
 |---|---|
-| `smoke_spike` | Emits high `smoke_ppm` values for the selected branch for 30 seconds; alert rules can raise a critical smoke alert. |
-| `device_offline` | Marks one selected-branch device offline and publishes `device.status_changed`. |
-| `illegal_exit` | Inserts an unauthorized gate-out event with an unknown RFID tag and publishes `gate.passed`; alert rules can raise a theft alert and attach the nearest camera clip. |
-| `sensor_glitch` | Emits `999999` sensor values for 30 seconds; the pipeline marks them dirty. |
-| `network_outage` | Suppresses selected-branch device heartbeats for 30 seconds; missed heartbeats can mark devices offline. |
-| `overload` | Queues and flushes 500 telemetry samples for the selected branch. |
-| `recover` | Restores selected-branch offline devices to online and publishes status changes. |
+| `smoke_spike` | Immediately emits high `smoke_ppm` telemetry for the selected branch; alert rules raise a critical `smoke` alert when thresholds are configured. |
+| `device_offline` | Marks one selected-branch device offline, publishes `device.status_changed`, and raises a `device_offline` alert. |
+| `illegal_exit` | Inserts an unauthorized gate-out event with an unknown RFID tag, publishes `gate.passed`, and raises a `theft` alert linked to the nearest camera clip when one exists. |
+| `sensor_glitch` | Emits a `999999` sensor value; the pipeline stores it as `quality=dirty` and publishes `telemetry.received`. Dirty data is retained. |
+| `network_outage` | Marks one selected-branch device offline with `reason=network_outage` and `missedIntervals=3`; alert rules raise a `device_offline` alert. |
+| `overload` | Queues and flushes 500 telemetry samples for the selected branch without dropping messages. |
+| `recover` | Restores selected-branch offline devices to online and publishes `device.status_changed` status changes. |
+
+Simulator start/stop/speed changes and scenario queue/completion events are
+visible through `GET /api/stream?topics=simulator.log`. Scenario-triggered
+alerts and status changes are visible through the same SSE stream by adding
+`alert.raised`, `device.status_changed`, `telemetry.received`, or `gate.passed`
+to the `topics` query.
 
 ## Missing Endpoints
 
 | Requirement | Status |
 |---|---|
-| Excel/history export by branch and time | missing |
-| Archive data older than two years | missing |
-| Daily telemetry curves API | missing |
+| Excel/history export by branch and time | implemented by `GET /api/exports/preview`, `GET /api/exports/download`, `GET /api/exports/history`, and `GET /api/exports/:id/download` |
+| Archive data older than two years | implemented by `POST /api/telemetry/archive` and `npm run archive` (telemetry only) |
+| Daily telemetry curves API | implemented by `GET /api/telemetry?aggregate=daily` |
 | Camera clip retrieval API | missing |
 | Gate event query API | missing |
 | QR-only reader authentication | missing |

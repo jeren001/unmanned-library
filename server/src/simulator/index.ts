@@ -6,12 +6,14 @@ import { TelemetryPipeline } from "../integration/telemetryPipeline.js";
 import { CirculationService } from "../domain/circulationService.js";
 
 export type Scenario = "smoke_spike" | "device_offline" | "illegal_exit" | "sensor_glitch" | "network_outage" | "overload" | "recover";
-export type SimulatorOptions = { enabled?: boolean; intervalMs?: number; seed?: number };
+export type SimulatorOptions = { enabled?: boolean; intervalMs?: number; speed?: number; seed?: number };
 
 export class LibrarySimulator {
   private timer: NodeJS.Timeout | undefined;
   private running = false;
   private scenarioState = new Map<string, { scenario: Scenario; until: number }>();
+  private readonly baseIntervalMs: number;
+  private speed: number;
   private readonly pipeline: TelemetryPipeline;
   private readonly ownsPipeline: boolean;
   private readonly circulation: CirculationService;
@@ -19,6 +21,8 @@ export class LibrarySimulator {
   private readonly missedHeartbeats = new Map<string, number>();
   private randomState: number;
   constructor(private readonly repo: LibraryRepository, private readonly bus: EventBus, private readonly options: SimulatorOptions = {}, pipeline?: TelemetryPipeline) {
+    this.baseIntervalMs = Math.max(Number(options.intervalMs ?? 5_000), 100);
+    this.speed = this.normalizeSpeed(options.speed ?? 1);
     this.pipeline = pipeline ?? new TelemetryPipeline(repo, bus);
     this.ownsPipeline = !pipeline;
     this.circulation = new CirculationService(repo, bus);
@@ -28,8 +32,15 @@ export class LibrarySimulator {
     if (this.running || this.options.enabled === false) return;
     this.running = true;
     this.pipeline.start();
-    this.timer = setInterval(() => void this.tick(), this.options.intervalMs ?? 5_000);
+    this.timer = setInterval(() => void this.tick(), this.effectiveIntervalMs());
+    this.log("start", "started", "Simulator started");
     void this.tick();
+  }
+  startControl(speed?: number) {
+    this.options.enabled = true;
+    if (speed !== undefined) this.setSpeed(speed, false);
+    this.start();
+    return this.status();
   }
   setEnabled(enabled: boolean) {
     this.options.enabled = enabled;
@@ -43,15 +54,50 @@ export class LibrarySimulator {
     this.running = false;
     if (this.ownsPipeline) this.pipeline.stop();
     await this.pipeline.flush();
+    this.log("stop", "stopped", "Simulator stopped");
+  }
+  setSpeed(speed: number, emitLog = true) {
+    this.speed = this.normalizeSpeed(speed);
+    if (this.running) {
+      if (this.timer) clearInterval(this.timer);
+      this.timer = setInterval(() => void this.tick(), this.effectiveIntervalMs());
+    }
+    if (emitLog) this.log("speed", "updated", `Simulator speed set to ${this.speed}x`);
+    return this.status();
   }
   async scenario(scenario: Scenario, branchId?: string) {
     const branch = branchId ?? String((this.repo.list("branches", { limit: 1 })[0] as { id: string } | undefined)?.id ?? "branch-east");
     this.scenarioState.set(branch, { scenario, until: Date.now() + (scenario === "recover" ? 0 : 30_000) });
-    if (scenario === "overload") {
+    this.log("scenario", "queued", `Scenario queued: ${scenario}`, { branchId: branch, scenario });
+    const result: Record<string, unknown> = { scenario, branchId: branch };
+    if (scenario === "smoke_spike") {
+      const device = this.device(branch, "smoke") ?? this.device(branch);
+      if (!device) throw new Error(`No device configured for branch ${branch}`);
+      this.pipeline.enqueue({ deviceId: device.id, branchId: branch, metric: "smoke_ppm", value: 20, quality: "ok", ts: new Date().toISOString(), source: "simulator" });
+      await this.pipeline.flush();
+      await this.bus.idle();
+      result.alerts = this.repo.alertList({ branchId: branch, type: "smoke", limit: 5 });
+    } else if (scenario === "sensor_glitch") {
+      const device = this.device(branch) as { id: string } | undefined;
+      if (!device) throw new Error(`No device configured for branch ${branch}`);
+      this.pipeline.enqueue({ deviceId: device.id, branchId: branch, metric: "temperature", value: 999999, quality: "dirty", ts: new Date().toISOString(), source: "simulator" });
+      await this.pipeline.flush();
+      result.dirtySamples = this.repo.telemetry({ branchId: branch, metric: "temperature" }).filter((row) => (row as { quality?: string }).quality === "dirty").length;
+    } else if (scenario === "network_outage") {
+      const device = this.device(branch) as { id: string; status: "online" | "offline" | "fault"; name?: string; kind?: string } | undefined;
+      if (!device) throw new Error(`No device configured for branch ${branch}`);
+      this.repo.update("devices", device.id, { status: "offline", last_seen_at: null });
+      this.missedHeartbeats.set(device.id, 3);
+      await this.bus.publish("device.status_changed", { deviceId: device.id, branchId: branch, name: device.name, kind: device.kind, from: device.status, to: "offline", reason: "network_outage", ts: new Date().toISOString(), missedIntervals: 3 });
+      await this.bus.idle();
+      result.device = this.repo.get("devices", device.id);
+      result.alerts = this.repo.alertList({ branchId: branch, type: "device_offline", limit: 5 });
+    } else if (scenario === "overload") {
       const device = this.repo.list("devices", { branchId: branch, limit: 1 })[0] as { id: string } | undefined;
       if (!device) throw new Error(`No device configured for branch ${branch}`);
       for (let i = 0; i < 500; i += 1) this.pipeline.enqueue(this.sample(device.id, branch, `overload_${i}`));
       await this.pipeline.flush();
+      result.persisted = this.repo.telemetry({ branchId: branch, metric: "overload_7" }).length > 0;
     } else if (scenario === "illegal_exit") {
       const device = this.repo.list("devices", { branchId: branch, limit: 200 })
         .find((row) => (row as { kind?: string }).kind === "gate") as { id: string } | undefined;
@@ -66,11 +112,16 @@ export class LibrarySimulator {
         authorized: 0, ts: gateEvent.ts
       });
       await this.bus.publish("gate.passed", gateEvent);
+      await this.bus.idle();
+      result.alerts = this.repo.alertList({ branchId: branch, type: "theft", limit: 5 });
     } else if (scenario === "device_offline") {
       const device = this.repo.list("devices", { branchId: branch, limit: 1 })[0] as { id: string; status: "online" | "offline" | "fault"; name?: string; kind?: string } | undefined;
       if (device) {
         this.repo.update("devices", device.id, { status: "offline", last_seen_at: null });
         await this.bus.publish("device.status_changed", { deviceId: device.id, branchId: branch, name: device.name, kind: device.kind, from: device.status, to: "offline", reason: "scenario", ts: new Date().toISOString() });
+        await this.bus.idle();
+        result.device = this.repo.get("devices", device.id);
+        result.alerts = this.repo.alertList({ branchId: branch, type: "device_offline", limit: 5 });
       }
     } else if (scenario === "recover") {
       const devices = this.repo.list("devices", { branchId: branch, status: "offline", limit: 200 }) as Array<{ id: string; status: "offline"; name?: string; kind?: string }>;
@@ -79,11 +130,40 @@ export class LibrarySimulator {
         this.missedHeartbeats.delete(device.id);
         await this.bus.publish("device.status_changed", { deviceId: device.id, branchId: branch, name: device.name, kind: device.kind, from: "offline", to: "online", reason: "scenario_recover", ts: new Date().toISOString() });
       }
+      result.recovered = devices.length;
     }
-    return { scenario, branchId: branch, queued: this.pipeline.size() };
+    result.queued = this.pipeline.size();
+    this.log("scenario", "completed", `Scenario completed: ${scenario}`, { branchId: branch, scenario, result });
+    return result;
   }
   status() {
-    return { enabled: this.options.enabled !== false, running: this.running, queued: this.pipeline.size(), scenarios: Object.fromEntries(this.scenarioState) };
+    return { enabled: this.options.enabled !== false, running: this.running, speed: this.speed, intervalMs: this.effectiveIntervalMs(), queued: this.pipeline.size(), scenarios: Object.fromEntries(this.scenarioState) };
+  }
+  private device(branchId: string, kind?: string) {
+    const devices = this.repo.list("devices", { branchId, limit: 200 }) as Array<{ id: string; kind?: string; status: "online" | "offline" | "fault"; name?: string }>;
+    return kind ? devices.find((row) => row.kind === kind) : devices[0];
+  }
+  private effectiveIntervalMs() {
+    return Math.max(Math.round(this.baseIntervalMs / this.speed), 50);
+  }
+  private normalizeSpeed(speed: number) {
+    if (!Number.isFinite(speed) || speed <= 0) throw new Error("Simulator speed must be a positive number");
+    return Math.min(Math.max(speed, 0.1), 100);
+  }
+  private log(action: "start" | "stop" | "speed" | "scenario", status: "started" | "stopped" | "updated" | "queued" | "completed" | "failed", message: string, extra: Record<string, unknown> = {}) {
+    const branchId = typeof extra.branchId === "string" ? extra.branchId : null;
+    const scenario = typeof extra.scenario === "string" ? extra.scenario : undefined;
+    this.bus.publishNoWait("simulator.log", {
+      action,
+      status,
+      branchId,
+      scenario,
+      speed: this.speed,
+      intervalMs: this.effectiveIntervalMs(),
+      message,
+      details: extra,
+      ts: new Date().toISOString()
+    });
   }
   private async tick() {
     for (const branch of this.repo.list("branches", { limit: 200 }) as Array<{ id: string }>) {

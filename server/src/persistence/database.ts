@@ -218,6 +218,22 @@ CREATE TABLE IF NOT EXISTS audit_log (
   updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS export_history (
+  id TEXT PRIMARY KEY,
+  dataset TEXT NOT NULL CHECK (dataset IN ('loans','books','readers','telemetry','alerts','maintenance')),
+  locale TEXT NOT NULL CHECK (locale IN ('en','zh-CN')),
+  branch_id TEXT,
+  from_ts TEXT,
+  to_ts TEXT,
+  row_count INTEGER NOT NULL,
+  file_name TEXT NOT NULL,
+  download_path TEXT NOT NULL,
+  created_by TEXT REFERENCES users(id),
+  detail_json TEXT NOT NULL DEFAULT '{}',
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS notifications (
   id TEXT PRIMARY KEY,
   user_id TEXT REFERENCES users(id),
@@ -234,6 +250,21 @@ PRAGMA user_version = 1;
 `;
 
 const additiveSql = `
+CREATE TABLE IF NOT EXISTS telemetry_archive (
+  id TEXT PRIMARY KEY,
+  device_id TEXT NOT NULL REFERENCES devices(id),
+  branch_id TEXT NOT NULL REFERENCES branches(id),
+  metric TEXT NOT NULL,
+  value REAL NOT NULL,
+  quality TEXT NOT NULL CHECK (quality IN ('ok','suspect','dirty')),
+  ts TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  archived_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_telemetry_archive_branch_metric_ts ON telemetry_archive(branch_id, metric, ts);
+
 CREATE TABLE IF NOT EXISTS notifications (
   id TEXT PRIMARY KEY,
   user_id TEXT REFERENCES users(id),
@@ -254,7 +285,35 @@ CREATE TABLE IF NOT EXISTS alert_notes (
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS export_history (
+  id TEXT PRIMARY KEY,
+  dataset TEXT NOT NULL CHECK (dataset IN ('loans','books','readers','telemetry','alerts','maintenance')),
+  locale TEXT NOT NULL CHECK (locale IN ('en','zh-CN')),
+  branch_id TEXT,
+  from_ts TEXT,
+  to_ts TEXT,
+  row_count INTEGER NOT NULL,
+  file_name TEXT NOT NULL,
+  download_path TEXT NOT NULL,
+  created_by TEXT REFERENCES users(id),
+  detail_json TEXT NOT NULL DEFAULT '{}',
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
 `;
+
+// The audit log is append-only: SQLite rejects any UPDATE or DELETE on it.
+const auditLogImmutableSql = `
+CREATE TRIGGER IF NOT EXISTS audit_log_no_update BEFORE UPDATE ON audit_log
+BEGIN SELECT RAISE(ABORT, 'audit_log is append-only'); END;
+CREATE TRIGGER IF NOT EXISTS audit_log_no_delete BEFORE DELETE ON audit_log
+BEGIN SELECT RAISE(ABORT, 'audit_log is append-only'); END;
+`;
+
+export function ensureAuditLogImmutable(db: SqliteDatabase) {
+  db.exec(auditLogImmutableSql);
+}
 
 export function createDatabase(filename = process.env.DB_FILE ?? resolve(process.cwd(), "data/library.sqlite")) {
   if (filename !== ":memory:") mkdirSync(dirname(filename), { recursive: true });
@@ -271,6 +330,7 @@ export function createDatabase(filename = process.env.DB_FILE ?? resolve(process
     transaction();
   }
   db.exec(additiveSql);
+  ensureAuditLogImmutable(db);
   return db;
 }
 

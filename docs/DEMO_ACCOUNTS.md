@@ -1,52 +1,87 @@
-# Demo Accounts
+# Seeded Demo Accounts
 
-Created by the seed script: [`server/src/seed.ts`](../server/src/seed.ts) (function `seedUsers`, lines 76-100).
-
-Recreate them with:
+These accounts are created by `server/src/seed.ts` when running:
 
 ```bash
 npm run seed
 ```
 
-The login page ([`web/src/login/LoginPage.tsx`](../web/src/login/LoginPage.tsx), `demoAccounts`) has matching
-prefill buttons, and the same three accounts are mirrored as an in-memory fallback in
-`seedUsers()` in [`server/src/api/auth.ts`](../server/src/api/auth.ts) when no database is attached.
+All seeded reader accounts use password `reader123`. The librarian and admin
+accounts have no card number. Card login is available only for readers through
+`POST /api/auth/card-login`.
 
-## Accounts
+| Role | Login | Password | Card number |
+|---|---|---|---|
+| reader | `R-2048` | `reader123` | `20240001` |
+| reader | `R-20240002` | `reader123` | `20240002` |
+| reader | `R-20240003` | `reader123` | `20240003` |
+| reader | `R-20240004` | `reader123` | `20240004` |
+| reader | `R-20240005` | `reader123` | `20240005` |
+| reader | `R-20240006` | `reader123` | `20240006` |
+| reader | `R-20240007` | `reader123` | `20240007` |
+| reader | `R-20240008` | `reader123` | `20240008` |
+| reader | `R-20240009` | `reader123` | `20240009` |
+| reader | `R-20240010` | `reader123` | `20240010` |
+| reader | `R-20240011` | `reader123` | `20240011` |
+| reader | `R-20240012` | `reader123` | `20240012` |
+| reader | `R-20240013` | `reader123` | `20240013` |
+| reader | `R-20240014` | `reader123` | `20240014` |
+| reader | `R-20240015` | `reader123` | `20240015` |
+| reader | `R-20240016` | `reader123` | `20240016` |
+| reader | `R-20240017` | `reader123` | `20240017` |
+| reader | `R-20240018` | `reader123` | `20240018` |
+| reader | `R-20240019` | `reader123` | `20240019` |
+| reader | `R-20240020` | `reader123` | `20240020` |
+| reader | `R-20240021` | `reader123` | `20240021` |
+| reader | `R-20240022` | `reader123` | `20240022` |
+| reader | `R-20240023` | `reader123` | `20240023` |
+| reader | `R-20240024` | `reader123` | `20240024` |
+| reader | `R-20240025` | `reader123` | `20240025` |
+| reader | `R-20240026` | `reader123` | `20240026` |
+| reader | `R-20240027` | `reader123` | `20240027` |
+| reader | `R-20240028` | `reader123` | `20240028` |
+| reader | `R-20240029` | `reader123` | `20240029` |
+| reader | `R-20240030` | `reader123` | `20240030` |
+| reader | `R-20240031` | `reader123` | `20240031` |
+| reader | `R-20240032` | `reader123` | `20240032` |
+| reader | `R-20240033` | `reader123` | `20240033` |
+| reader | `R-20240034` | `reader123` | `20240034` |
+| reader | `R-20240035` | `reader123` | `20240035` |
+| reader | `R-20240036` | `reader123` | `20240036` |
+| reader | `R-20240037` | `reader123` | `20240037` |
+| reader | `R-20240038` | `reader123` | `20240038` |
+| reader | `R-20240039` | `reader123` | `20240039` |
+| reader | `R-20240040` | `reader123` | `20240040` |
+| reader | `R-20240041` | `reader123` | `20240041` |
+| reader | `R-20240042` | `reader123` | `20240042` |
+| reader | `R-20240043` | `reader123` | `20240043` |
+| reader | `R-20240044` | `reader123` | `20240044` |
+| reader | `R-20240045` | `reader123` | `20240045` |
+| reader | `R-20240046` | `reader123` | `20240046` |
+| reader | `R-20240047` | `reader123` | `20240047` |
+| reader | `R-20240048` | `reader123` | `20240048` |
+| reader | `R-20240049` | `reader123` | `20240049` |
+| reader | `R-20240050` | `reader123` | `20240050` |
+| reader | `R-20240051` | `reader123` | `20240051` |
+| reader | `R-20240052` | `reader123` | `20240052` |
+| reader | `R-20240053` | `reader123` | `20240053` |
+| reader | `R-20240054` | `reader123` | `20240054` |
+| reader | `R-20240055` | `reader123` | `20240055` |
+| reader | `R-20240056` | `reader123` | `20240056` |
+| reader | `R-20240057` | `reader123` | `20240057` |
+| reader | `R-20240058` | `reader123` | `20240058` |
+| reader | `R-20240059` | `reader123` | `20240059` |
+| reader | `R-20240060` | `reader123` | `20240060` |
+| librarian | `librarian` | `librarian123` | — |
+| admin | `admin` | `admin123` | — |
 
-| Role | Username | Email | Password | Card no. | PIN |
-|---|---|---|---|---|---|
-| reader (`reader-001`, 林知秋) | `R-2048` | `reader.demo@library.local` | `reader123` | `20240001` | none |
-| librarian (`librarian-001`, 馆员值班台) | `librarian` | `librarian@library.local` | `librarian123` | — | none |
-| admin (`admin-001`, 系统管理员) | `admin` | `admin@library.local` | `admin123` | — | none |
+The seed creates 60 readers plus one librarian and one admin. Reader logins
+`R-20240002` through `R-20240060` correspond to seed user IDs
+`reader-002` through `reader-060`; their email logins are
+`reader2@library.local` through `reader60@library.local`. The first reader's
+email login is `reader.demo@library.local`; the staff email logins are
+`librarian@library.local` and `admin@library.local`.
 
-There is no PIN field in the schema or the login flow. Readers authenticate either with the
-username/email + password pair or by card number only through `POST /api/auth/card-login`.
-
-## Bulk reader accounts
-
-The seed also creates 59 additional readers, `reader-002` through `reader-060`:
-
-- Username: `R-20240002` … `R-20240060`
-- Email: `reader2@library.local` … `reader60@library.local`
-- Password: `reader123` (all of them)
-- Card no.: identical to the username suffix, `20240002` … `20240060`
-- About 4% of them are seeded with `status: "suspended"` rather than `"active"`.
-
-## Logging in
-
-```bash
-# role + account + password
-curl -s -X POST localhost:3001/api/auth/login \
-  -H 'content-type: application/json' \
-  -d '{"role":"admin","account":"admin","password":"admin123"}'
-
-# reader card only
-curl -s -X POST localhost:3001/api/auth/card-login \
-  -H 'content-type: application/json' \
-  -d '{"cardNumber":"20240001"}'
-```
-
-The response sets an `HttpOnly` session cookie (`ul_session`) valid for 8 hours, or 14 days when
-`"remember": true` is passed. The role must match the account: an `admin` login with
-`account: "librarian"` is rejected.
+Reader statuses are generated by the seed's deterministic random generator and
+may change if the seed logic changes. Passwords are stored as bcrypt hashes in
+SQLite.

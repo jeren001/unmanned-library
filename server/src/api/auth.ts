@@ -4,6 +4,7 @@ import { Router } from "express";
 import bcrypt from "bcrypt";
 import { z } from "zod";
 import type { LibraryRepository } from "../persistence/repositories.js";
+import { maskAccount, maskTail } from "../domain/privacy.js";
 
 export type Role = "reader" | "librarian" | "admin";
 
@@ -39,6 +40,8 @@ const SESSION_TTL_MS = 1000 * 60 * 60 * 8;
 const LOCK_MS = 1000 * 60 * 10;
 const RATE_WINDOW_MS = 1000 * 60;
 const RATE_LIMIT = 12;
+// Per-IP cap so rotating account or card numbers cannot bypass the per-account limit.
+const IP_RATE_LIMIT = 30;
 
 const loginSchema = z.object({
   role: z.enum(["reader", "librarian", "admin"]),
@@ -53,7 +56,6 @@ const cardLoginSchema = z.object({
 
 const users = new Map<string, User>();
 const sessions = new Map<string, Session>();
-const rateBuckets = new Map<string, { count: number; resetAt: number }>();
 const failedAttempts = new Map<string, number>();
 export const auditLog: AuditEntry[] = [];
 
@@ -128,14 +130,14 @@ function findUserByCard(repo: LibraryRepository | undefined, cardNumber: string)
 }
 
 function audit(repo: LibraryRepository | undefined, entry: Omit<AuditEntry, "at">) {
-  const row = { ...entry, at: new Date().toISOString() };
+  const row = { ...entry, account: maskAccount(entry.account), at: new Date().toISOString() };
   auditLog.push(row);
   if (repo) {
     repo.recordAudit({
       actor_id: null,
       action: entry.event,
       entity: "auth",
-      entity_id: entry.account,
+      entity_id: row.account,
       detail_json: JSON.stringify({ role: entry.role, success: entry.success, reason: entry.reason }),
       ip: entry.ip,
       ts: row.at
@@ -187,22 +189,29 @@ function getSessionUser(req: Request) {
   return users.get(session.userId);
 }
 
-function rateLimit(req: Request, res: Response, next: NextFunction) {
-  const key = `${req.ip}:${req.body?.account ?? req.body?.cardNumber ?? "auth"}`;
-  const now = Date.now();
-  const bucket = rateBuckets.get(key);
-  if (!bucket || bucket.resetAt < now) {
-    rateBuckets.set(key, { count: 1, resetAt: now + RATE_WINDOW_MS });
+function createRateLimiter() {
+  const buckets = new Map<string, { count: number; resetAt: number }>();
+  const hit = (key: string, limit: number, now: number) => {
+    const bucket = buckets.get(key);
+    if (!bucket || bucket.resetAt < now) {
+      buckets.set(key, { count: 1, resetAt: now + RATE_WINDOW_MS });
+      return true;
+    }
+    bucket.count += 1;
+    return bucket.count <= limit;
+  };
+  return (req: Request, res: Response, next: NextFunction) => {
+    const now = Date.now();
+    if (buckets.size > 10_000) for (const [key, bucket] of buckets) if (bucket.resetAt < now) buckets.delete(key);
+    const account = String(req.body?.account ?? req.body?.cardNumber ?? "auth").toLowerCase();
+    const ipOk = hit(`ip:${req.ip}`, IP_RATE_LIMIT, now);
+    const accountOk = hit(`account:${req.ip}:${account}`, RATE_LIMIT, now);
+    if (!ipOk || !accountOk) {
+      res.status(429).json({ error: "RATE_LIMITED", message: "Too many attempts. Please wait a minute." });
+      return;
+    }
     next();
-    return;
-  }
-
-  bucket.count += 1;
-  if (bucket.count > RATE_LIMIT) {
-    res.status(429).json({ error: "RATE_LIMITED", message: "Too many attempts. Please wait a minute." });
-    return;
-  }
-  next();
+  };
 }
 
 function safePasswordCompare(password: string, hash: string) {
@@ -234,6 +243,7 @@ export function requireAuth(...allowedRoles: Role[]) {
 
 export function createAuthRouter(repo?: LibraryRepository) {
 const authRouter = Router();
+const rateLimit = createRateLimiter();
 
 authRouter.post("/login", rateLimit, async (req, res) => {
   const parsed = loginSchema.safeParse(req.body);
@@ -291,7 +301,7 @@ authRouter.post("/card-login", rateLimit, (req, res) => {
   const user = findUserByCard(repo, parsed.data.cardNumber);
   const matchedCard = user?.card_no && safeCardCompare(parsed.data.cardNumber, user.card_no);
   if (!user || !matchedCard) {
-    audit(repo, { event: "card-login", account: parsed.data.cardNumber, role: "reader", success: false, reason: "unknown-card", ip: req.ip });
+    audit(repo, { event: "card-login", account: String(maskTail(parsed.data.cardNumber)), role: "reader", success: false, reason: "unknown-card", ip: req.ip });
     res.status(401).json({ code: "INVALID_CARD", error: "INVALID_CARD", message: "Reader card was not recognized." });
     return;
   }

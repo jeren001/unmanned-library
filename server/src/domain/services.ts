@@ -1,8 +1,10 @@
-import type { AlertQuery, LibraryRepository, MaintenanceQuery, Query } from "../persistence/repositories.js";
+import ExcelJS from "exceljs";
+import type { AlertQuery, ExportDataset, ExportLocale, ExportQuery, LibraryRepository, MaintenanceQuery, Query, TelemetryQuery, TraceQuery } from "../persistence/repositories.js";
 import { AuditService } from "./auditService.js";
 import { CirculationService } from "./circulationService.js";
 import { LoanPolicy } from "./loanPolicy.js";
 import { asNumber, DomainError } from "./types.js";
+import { maskUser } from "./privacy.js";
 import type { EventBus } from "../events/bus.js";
 import type { AlertSeverity, AlertType } from "../events/types.js";
 import { DeviceAdapterFactory } from "../integration/factory.js";
@@ -17,7 +19,13 @@ class CrudService {
 }
 
 export class CatalogService extends CrudService { constructor(repo: LibraryRepository) { super(repo, "books"); } }
-export class MemberService extends CrudService { constructor(repo: LibraryRepository) { super(repo, "users"); } }
+export class MemberService extends CrudService {
+  constructor(repo: LibraryRepository) { super(repo, "users"); }
+  override list(query?: Query) { return (super.list(query) as Array<Record<string, unknown>>).map(maskUser); }
+  override get(id: string) { return maskUser(super.get(id) as Record<string, unknown>); }
+  override create(values: Record<string, unknown>) { return maskUser(super.create(values) as Record<string, unknown>); }
+  override update(id: string, values: Record<string, unknown>) { return maskUser(super.update(id, values) as Record<string, unknown>); }
+}
 export class BranchService extends CrudService { constructor(repo: LibraryRepository) { super(repo, "branches"); } }
 export class NotificationService extends CrudService { constructor(repo: LibraryRepository) { super(repo, "notifications"); } }
 export class DeviceService extends CrudService {
@@ -247,7 +255,32 @@ export class TelemetryService {
   constructor(private readonly repo: LibraryRepository) {
     this.policy = new LoanPolicy(repo);
   }
-  query(query: Query & { metric?: string; from?: string; to?: string }) { return this.repo.telemetry(query); }
+  query(query: TelemetryQuery) {
+    const mode = query.mode ?? "raw";
+    const aggregate = query.aggregate ?? "raw";
+    const normalized = { ...query, mode, aggregate };
+    const rawRows = this.repo.telemetryRows({ ...normalized, mode: "raw" }) as Array<Record<string, unknown>>;
+    const series = aggregate === "raw"
+      ? this.repo.telemetryRows(normalized)
+      : this.repo.telemetryAggregate(normalized);
+    const response: Record<string, unknown> = {
+      branchId: query.branchId,
+      metric: query.metric,
+      from: query.from ?? null,
+      to: query.to ?? null,
+      aggregate,
+      mode,
+      series,
+      anomalies: this.anomalies(rawRows)
+    };
+    if (query.compareBranchId) {
+      const comparisonAggregate = aggregate === "raw" ? "hourly" : aggregate;
+      const base = this.repo.telemetryBranchAggregate({ ...normalized, aggregate: comparisonAggregate }, query.branchId) as Array<Record<string, unknown>>;
+      const compare = this.repo.telemetryBranchAggregate({ ...normalized, branchId: query.compareBranchId, aggregate: comparisonAggregate }, query.compareBranchId) as Array<Record<string, unknown>>;
+      response.comparison = this.compare(query.branchId, query.compareBranchId, comparisonAggregate, base, compare);
+    }
+    return response;
+  }
   ingest(input: { deviceId: string; branchId: string; metric: string; value: number; ts?: string }) {
     const quality = this.flagQuality(input.metric, input.value);
     return this.repo.ingestTelemetry({
@@ -259,12 +292,438 @@ export class TelemetryService {
       ts: input.ts ?? new Date().toISOString()
     });
   }
+  archive(options: { now?: Date; olderThanYears?: number } = {}) {
+    // Cut on an hour boundary so an hour is never split between telemetry and telemetry_archive.
+    const cutoffDate = new Date(options.now ?? new Date());
+    cutoffDate.setUTCFullYear(cutoffDate.getUTCFullYear() - (options.olderThanYears ?? 2));
+    cutoffDate.setUTCMinutes(0, 0, 0);
+    const cutoff = cutoffDate.toISOString();
+    return { moved: this.repo.archiveTelemetryBefore(cutoff), cutoff };
+  }
   private flagQuality(metric: string, value: number) {
     if (!Number.isFinite(value)) return "dirty";
     const threshold = this.policy.values().thresholds[metric];
     if (threshold && ((threshold.min !== undefined && value < threshold.min) || (threshold.max !== undefined && value > threshold.max))) return "suspect";
     if (Math.abs(asNumber(value)) > 100000) return "dirty";
     return "ok";
+  }
+  private anomalies(rows: Array<Record<string, unknown>>) {
+    const ranges: Record<string, { min: number; max: number; jump: number }> = {
+      temperature: { min: -30, max: 60, jump: 15 },
+      humidity: { min: 0, max: 100, jump: 50 },
+      light_lux: { min: 0, max: 100_000, jump: 5_000 },
+      smoke_ppm: { min: 0, max: 1_000, jump: 50 },
+      occupancy: { min: 0, max: 10_000, jump: 5_000 },
+      headcount: { min: 0, max: 10_000, jump: 5_000 },
+      heartbeat: { min: 0, max: 1, jump: 1 }
+    };
+    const previous = new Map<string, { value: number; ts: number }>();
+    return rows.flatMap((row) => {
+      const value = asNumber(row.value);
+      const metric = String(row.metric);
+      const quality = String(row.quality);
+      const ts = String(row.ts);
+      const parsedTs = Date.parse(ts);
+      const key = `${String(row.device_id)}:${metric}`;
+      const prior = previous.get(key);
+      const range = ranges[metric];
+      const reasons = new Set<string>();
+      if (quality === "dirty" || !Number.isFinite(value) || Math.abs(value) > 100000) reasons.add("garbage_after_outage");
+      if (range && (value < range.min || value > range.max)) reasons.add("out_of_range");
+      if (!Number.isFinite(parsedTs) || (prior && parsedTs <= prior.ts) || (quality === "suspect" && Number.isFinite(parsedTs) && Date.now() - parsedTs > 24 * 60 * 60 * 1000)) reasons.add("stale");
+      if (prior && range && Math.abs(value - prior.value) > range.jump) reasons.add("jump");
+      if (quality === "suspect" && reasons.size === 0) reasons.add("out_of_range");
+      if (Number.isFinite(parsedTs)) previous.set(key, { value, ts: parsedTs });
+      if (reasons.size === 0) return [];
+      return [{
+        sampleId: row.id,
+        branch_id: row.branch_id,
+        device_id: row.device_id,
+        metric,
+        value,
+        quality,
+        ts,
+        reasons: [...reasons]
+      }];
+    });
+  }
+  private compare(branchId: string, compareBranchId: string, aggregate: "hourly" | "daily", base: Array<Record<string, unknown>>, compare: Array<Record<string, unknown>>) {
+    const compareByBucket = new Map(compare.map((row) => [String(row.bucket_ts), row]));
+    const baseBuckets = new Set(base.map((row) => String(row.bucket_ts)));
+    return {
+      baseBranchId: branchId,
+      compareBranchId,
+      aggregate,
+      points: [
+        ...base.map((row) => {
+          const other = compareByBucket.get(String(row.bucket_ts));
+          return {
+            bucket_ts: row.bucket_ts,
+            base: row,
+            compare: other ?? null,
+            delta_avg: other ? asNumber(row.avg) - asNumber(other.avg) : null
+          };
+        }),
+        ...compare.filter((row) => !baseBuckets.has(String(row.bucket_ts))).map((row) => ({
+          bucket_ts: row.bucket_ts,
+          base: null,
+          compare: row,
+          delta_avg: null
+        }))
+      ].sort((left, right) => String(left.bucket_ts).localeCompare(String(right.bucket_ts)))
+    };
+  }
+}
+
+type TraceStep = {
+  order: number;
+  kind: "book" | "rfid_tag" | "loan_transaction" | "device_event" | "camera_clip" | "alert" | "maintenance";
+  ts: string | null;
+  record: Record<string, unknown>;
+};
+
+export class TraceService {
+  constructor(private readonly repo: LibraryRepository) {}
+  query(input: TraceQuery) {
+    const resolved = this.resolve(input);
+    const book = resolved.book;
+    const loan = resolved.loan;
+    const rfidTag = String(book.rfid_tag);
+    const window = this.window(book, loan, resolved.alert);
+    const gateEvents = this.repo.gateEventsForTrace({
+      branchId: window.branchId,
+      rfidTag,
+      from: window.from,
+      to: window.to
+    }) as Array<Record<string, unknown>>;
+    const clips = this.clipEvidence(window.branchId, window.from, window.to);
+    const clipIds = clips.map((clip) => String(clip.id));
+    const alerts = this.relatedAlerts(window.branchId, loan ? String(loan.id) : undefined, clipIds, window.from, window.to, resolved.alert);
+    const maintenance = this.repo.maintenanceForTrace(alerts.map((alert) => String(alert.id))) as Array<Record<string, unknown>>;
+    const chain: TraceStep[] = [];
+    chain.push({ order: chain.length + 1, kind: "book", ts: String(book.created_at ?? null), record: book });
+    chain.push({ order: chain.length + 1, kind: "rfid_tag", ts: String(book.updated_at ?? book.created_at ?? null), record: { tag: rfidTag, book_id: book.id, branch_id: book.branch_id } });
+    if (loan) chain.push({ order: chain.length + 1, kind: "loan_transaction", ts: String(loan.borrowed_at), record: this.loanRecord(loan) });
+    if (loan?.device_id) chain.push({ order: chain.length + 1, kind: "device_event", ts: String(loan.borrowed_at), record: this.loanDeviceEvent(loan) });
+    for (const event of gateEvents) chain.push({ order: chain.length + 1, kind: "device_event", ts: String(event.ts), record: this.gateRecord(event) });
+    for (const clip of clips) chain.push({ order: chain.length + 1, kind: "camera_clip", ts: String(clip.start_ts), record: clip });
+    for (const alert of alerts) chain.push({ order: chain.length + 1, kind: "alert", ts: String(alert.created_at), record: alert });
+    for (const item of maintenance) chain.push({ order: chain.length + 1, kind: "maintenance", ts: String(item.started_at), record: item });
+    return {
+      input,
+      window,
+      chain: chain.map((step, index) => ({ ...step, order: index + 1 }))
+    };
+  }
+  private resolve(input: TraceQuery) {
+    if (input.alertId) {
+      const alert = this.repo.alertDetail(input.alertId) as Record<string, unknown> | undefined;
+      if (!alert) throw new DomainError("TRACE_NOT_FOUND", "Alert not found");
+      const loan = alert.related_loan_id ? this.repo.loanDetail(String(alert.related_loan_id)) : undefined;
+      if (!loan) throw new DomainError("TRACE_NOT_FOUND", "Alert is not linked to a loan trace");
+      const book = this.repo.findBook(String(loan.book_id));
+      if (!book) throw new DomainError("TRACE_NOT_FOUND", "Book not found for alert trace");
+      return { book, loan, alert };
+    }
+    if (input.loanId) {
+      const loan = this.repo.loanDetail(input.loanId);
+      if (!loan) throw new DomainError("TRACE_NOT_FOUND", "Loan not found");
+      const book = this.repo.findBook(String(loan.book_id));
+      if (!book) throw new DomainError("TRACE_NOT_FOUND", "Book not found for loan trace");
+      return { book, loan, alert: undefined };
+    }
+    if (input.book) {
+      const book = this.repo.findBookForTrace(input.book);
+      if (!book) throw new DomainError("TRACE_NOT_FOUND", "Book not found");
+      return { book, loan: this.repo.latestLoanForBook(String(book.id)), alert: undefined };
+    }
+    throw new DomainError("TRACE_NOT_FOUND", "Provide book, loanId, or alertId");
+  }
+  private window(book: Record<string, unknown>, loan?: Record<string, unknown>, alert?: Record<string, unknown>) {
+    const branchId = String(loan?.branch_id ?? alert?.branch_id ?? book.branch_id);
+    const borrowedAt = loan?.borrowed_at ? String(loan.borrowed_at) : undefined;
+    const returnedAt = loan?.returned_at ? String(loan.returned_at) : undefined;
+    const alertAt = alert?.created_at ? String(alert.created_at) : undefined;
+    const from = borrowedAt ?? alertAt ?? String(book.created_at);
+    const to = returnedAt ?? alertAt ?? new Date().toISOString();
+    return { branchId, from, to, source: loan ? "loan" : alert ? "alert" : "book" };
+  }
+  private clipEvidence(branchId: string, from: string, to: string) {
+    const clips = this.repo.cameraClipsForTrace({ branchId, from, to }) as Array<Record<string, unknown>>;
+    if (clips.length > 0) return clips;
+    const nearest = this.repo.findNearestClip(branchId, from);
+    return nearest ? [nearest] : [];
+  }
+  private relatedAlerts(branchId: string, loanId: string | undefined, clipIds: string[], from: string, to: string, alert?: Record<string, unknown>) {
+    const alerts = this.repo.alertsForTrace({ branchId, loanId, clipIds, from, to }) as Array<Record<string, unknown>>;
+    if (alert && !alerts.some((row) => row.id === alert.id)) return [...alerts, alert].sort((left, right) => String(left.created_at).localeCompare(String(right.created_at)));
+    return alerts;
+  }
+  private loanRecord(loan: Record<string, unknown>) {
+    return {
+      ...loan,
+      who: { user_id: loan.user_id, name: loan.user_name ?? null, account: loan.user_account ?? null },
+      when: { borrowed_at: loan.borrowed_at, returned_at: loan.returned_at ?? null, due_at: loan.due_at }
+    };
+  }
+  private loanDeviceEvent(loan: Record<string, unknown>) {
+    return {
+      id: `loan-device-${String(loan.id)}`,
+      source: "loan",
+      branch_id: loan.branch_id,
+      device_id: loan.device_id,
+      device_name: loan.device_name ?? null,
+      device_kind: loan.device_kind ?? null,
+      action: "borrow",
+      ts: loan.borrowed_at
+    };
+  }
+  private gateRecord(event: Record<string, unknown>) {
+    return {
+      ...event,
+      rfid_tags: this.parseTags(event.rfid_tags_json)
+    };
+  }
+  private parseTags(value: unknown) {
+    try {
+      return JSON.parse(String(value)) as string[];
+    } catch {
+      return [];
+    }
+  }
+}
+
+type ExportColumn = {
+  key: string;
+  en: string;
+  zh: string;
+  type?: "date" | "number" | "money";
+};
+
+const exportColumns: Record<ExportDataset, ExportColumn[]> = {
+  loans: [
+    { key: "id", en: "Loan ID", zh: "借阅编号" },
+    { key: "branch_name", en: "Branch", zh: "分馆" },
+    { key: "status", en: "Status", zh: "状态" },
+    { key: "book_title", en: "Book Title", zh: "书名" },
+    { key: "isbn", en: "ISBN", zh: "ISBN" },
+    { key: "rfid_tag", en: "RFID Tag", zh: "RFID 标签" },
+    { key: "reader_name", en: "Reader", zh: "读者" },
+    { key: "device_name", en: "Device", zh: "设备" },
+    { key: "borrowed_at", en: "Borrowed At", zh: "借出时间", type: "date" },
+    { key: "due_at", en: "Due At", zh: "应还时间", type: "date" },
+    { key: "returned_at", en: "Returned At", zh: "归还时间", type: "date" },
+    { key: "renew_count", en: "Renew Count", zh: "续借次数", type: "number" }
+  ],
+  books: [
+    { key: "id", en: "Book ID", zh: "图书编号" },
+    { key: "isbn", en: "ISBN", zh: "ISBN" },
+    { key: "title", en: "Title", zh: "书名" },
+    { key: "author", en: "Author", zh: "作者" },
+    { key: "category", en: "Category", zh: "分类" },
+    { key: "branch_name", en: "Branch", zh: "分馆" },
+    { key: "shelf_location", en: "Shelf", zh: "书架" },
+    { key: "edition", en: "Edition", zh: "版本" },
+    { key: "purchased_at", en: "Purchased At", zh: "采购时间", type: "date" },
+    { key: "rfid_tag", en: "RFID Tag", zh: "RFID 标签" },
+    { key: "status", en: "Status", zh: "状态" }
+  ],
+  readers: [
+    { key: "id", en: "Reader ID", zh: "读者编号" },
+    { key: "username", en: "Account", zh: "账号" },
+    { key: "display_name", en: "Name", zh: "姓名" },
+    { key: "email", en: "Email", zh: "邮箱" },
+    { key: "student_no", en: "Student No.", zh: "学号" },
+    { key: "card_no", en: "Card No.", zh: "卡号" },
+    { key: "deposit_cents", en: "Deposit (cents)", zh: "押金(分)", type: "number" },
+    { key: "loan_count", en: "Loan Count", zh: "借阅次数", type: "number" },
+    { key: "status", en: "Status", zh: "状态" },
+    { key: "created_at", en: "Created At", zh: "创建时间", type: "date" }
+  ],
+  telemetry: [
+    { key: "id", en: "Sample ID", zh: "采样编号" },
+    { key: "branch_name", en: "Branch", zh: "分馆" },
+    { key: "device_name", en: "Device", zh: "设备" },
+    { key: "metric", en: "Metric", zh: "指标" },
+    { key: "value", en: "Value", zh: "数值", type: "number" },
+    { key: "quality", en: "Quality", zh: "质量" },
+    { key: "ts", en: "Timestamp", zh: "采样时间", type: "date" }
+  ],
+  alerts: [
+    { key: "id", en: "Alert ID", zh: "告警编号" },
+    { key: "branch_name", en: "Branch", zh: "分馆" },
+    { key: "device_name", en: "Device", zh: "设备" },
+    { key: "type", en: "Type", zh: "类型" },
+    { key: "severity", en: "Severity", zh: "级别" },
+    { key: "message", en: "Message", zh: "消息" },
+    { key: "status", en: "Status", zh: "状态" },
+    { key: "created_at", en: "Created At", zh: "创建时间", type: "date" },
+    { key: "resolved_at", en: "Resolved At", zh: "解决时间", type: "date" }
+  ],
+  maintenance: [
+    { key: "id", en: "Record ID", zh: "记录编号" },
+    { key: "branch_name", en: "Branch", zh: "分馆" },
+    { key: "device_name", en: "Device", zh: "设备" },
+    { key: "kind", en: "Kind", zh: "类型" },
+    { key: "description", en: "Description", zh: "描述" },
+    { key: "status", en: "Status", zh: "状态" },
+    { key: "started_at", en: "Started At", zh: "开始时间", type: "date" },
+    { key: "finished_at", en: "Finished At", zh: "完成时间", type: "date" },
+    { key: "related_alert_id", en: "Related Alert", zh: "关联告警" }
+  ]
+};
+
+const sheetNames: Record<ExportLocale, Record<ExportDataset, string>> = {
+  en: { loans: "Loans", books: "Books", readers: "Readers", telemetry: "Telemetry", alerts: "Alerts", maintenance: "Maintenance" },
+  "zh-CN": { loans: "借阅", books: "图书", readers: "读者", telemetry: "遥测", alerts: "告警", maintenance: "维护" }
+};
+
+export class ExportService {
+  constructor(private readonly repo: LibraryRepository) {}
+  private exportRows(query: ExportQuery) {
+    const rows = this.repo.exportRows(query) as Array<Record<string, unknown>>;
+    return query.dataset === "readers" ? rows.map(maskUser) : rows;
+  }
+  preview(query: ExportQuery) {
+    const locale = query.locale ?? "en";
+    const rows = this.exportRows({ ...query, locale, limit: 20 }) as Array<Record<string, unknown>>;
+    const columns = exportColumns[query.dataset].map((column) => ({ key: column.key, header: this.header(column, locale), type: column.type ?? "text" }));
+    return {
+      dataset: query.dataset,
+      locale,
+      filters: this.filters(query),
+      columns,
+      rows: rows.map((row) => this.project(row, exportColumns[query.dataset]))
+    };
+  }
+  history(query?: Query) {
+    return this.repo.exportHistory(query).map((row) => this.withParsedDetail(row as Record<string, unknown>));
+  }
+  async create(query: ExportQuery, actorId: string, ip?: string) {
+    const locale = query.locale ?? "en";
+    const rows = this.exportRows({ ...query, locale }) as Array<Record<string, unknown>>;
+    const createdAt = new Date().toISOString();
+    const fileName = `${query.dataset}-${createdAt.replace(/[:.]/g, "-")}.xlsx`;
+    const history = this.repo.createExportHistory({
+      dataset: query.dataset,
+      locale,
+      branch_id: query.branchId ?? null,
+      from_ts: query.from ?? null,
+      to_ts: query.to ?? null,
+      row_count: rows.length,
+      file_name: fileName,
+      download_path: "",
+      created_by: actorId,
+      detail_json: JSON.stringify(this.filters(query))
+    }) as Record<string, unknown>;
+    const downloadPath = `/api/exports/${String(history.id)}/download`;
+    const saved = this.repo.update("export_history", String(history.id), { download_path: downloadPath }) as Record<string, unknown>;
+    this.repo.recordAudit({
+      actor_id: actorId,
+      action: "export_dataset",
+      entity: "export",
+      entity_id: String(history.id),
+      detail_json: JSON.stringify({ dataset: query.dataset, locale, rowCount: rows.length, filters: this.filters(query) }),
+      ip: ip ?? null
+    });
+    return { workbook: this.workbook({ ...query, locale }, rows, String(history.id), createdAt), history: this.withParsedDetail(saved), fileName };
+  }
+  async recreate(exportId: string, actorId: string, ip?: string) {
+    const history = this.repo.exportHistoryById(exportId);
+    if (!history) throw new DomainError("EXPORT_NOT_FOUND", "Export history record not found");
+    const query: ExportQuery & { locale: ExportLocale } = {
+      dataset: history.dataset as ExportDataset,
+      locale: history.locale as ExportLocale,
+      branchId: history.branch_id ? String(history.branch_id) : undefined,
+      from: history.from_ts ? String(history.from_ts) : undefined,
+      to: history.to_ts ? String(history.to_ts) : undefined
+    };
+    const rows = this.exportRows(query) as Array<Record<string, unknown>>;
+    this.repo.recordAudit({
+      actor_id: actorId,
+      action: "download_export",
+      entity: "export",
+      entity_id: exportId,
+      detail_json: JSON.stringify({ dataset: query.dataset, locale: query.locale, rowCount: rows.length, filters: this.filters(query) }),
+      ip: ip ?? null
+    });
+    return {
+      workbook: this.workbook(query, rows, exportId, String(history.created_at)),
+      history: this.withParsedDetail(history),
+      fileName: String(history.file_name)
+    };
+  }
+  async toBuffer(workbook: ExcelJS.Workbook) {
+    return Buffer.from(await workbook.xlsx.writeBuffer());
+  }
+  private workbook(query: ExportQuery & { locale: ExportLocale }, rows: Array<Record<string, unknown>>, exportId: string, createdAt: string) {
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = "Unmanned Library";
+    workbook.created = new Date(createdAt);
+    const columns = exportColumns[query.dataset];
+    const dataSheet = workbook.addWorksheet(sheetNames[query.locale][query.dataset], { views: [{ state: "frozen", ySplit: 1 }] });
+    dataSheet.columns = columns.map((column) => ({ key: column.key, header: this.header(column, query.locale), width: this.width(column) }));
+    dataSheet.getRow(1).font = { bold: true };
+    dataSheet.getRow(1).alignment = { vertical: "middle" };
+    for (const row of rows) dataSheet.addRow(this.project(row, columns));
+    columns.forEach((column, index) => {
+      const excelColumn = dataSheet.getColumn(index + 1);
+      if (column.type === "date") excelColumn.numFmt = "yyyy-mm-dd hh:mm:ss";
+      if (column.type === "number") excelColumn.numFmt = "0";
+      if (column.type === "money") excelColumn.numFmt = "0.00";
+    });
+    const summary = workbook.addWorksheet(query.locale === "zh-CN" ? "汇总" : "Summary");
+    summary.columns = [
+      { key: "field", header: query.locale === "zh-CN" ? "字段" : "Field", width: 24 },
+      { key: "value", header: query.locale === "zh-CN" ? "值" : "Value", width: 48 }
+    ];
+    summary.views = [{ state: "frozen", ySplit: 1 }];
+    summary.getRow(1).font = { bold: true };
+    [
+      ["exportId", exportId],
+      ["dataset", query.dataset],
+      ["locale", query.locale],
+      ["branchId", query.branchId ?? ""],
+      ["from", query.from ?? ""],
+      ["to", query.to ?? ""],
+      ["rowCount", rows.length],
+      ["generatedAt", createdAt]
+    ].forEach(([field, value]) => summary.addRow({ field, value }));
+    return workbook;
+  }
+  private project(row: Record<string, unknown>, columns: ExportColumn[]) {
+    return Object.fromEntries(columns.map((column) => [column.key, this.cell(row[column.key], column.type)]));
+  }
+  private cell(value: unknown, type?: ExportColumn["type"]) {
+    if (value === null || value === undefined) return "";
+    if (type === "date") {
+      const parsed = new Date(String(value));
+      return Number.isNaN(parsed.getTime()) ? String(value) : parsed;
+    }
+    if (type === "number" || type === "money") return Number(value);
+    return value;
+  }
+  private header(column: ExportColumn, locale: ExportLocale) {
+    return locale === "zh-CN" ? column.zh : column.en;
+  }
+  private width(column: ExportColumn) {
+    if (column.type === "date") return 22;
+    if (column.key.includes("message") || column.key.includes("description") || column.key.includes("title")) return 36;
+    return 18;
+  }
+  private filters(query: ExportQuery) {
+    return {
+      branchId: query.branchId ?? null,
+      from: query.from ?? null,
+      to: query.to ?? null
+    };
+  }
+  private withParsedDetail(row: Record<string, unknown>) {
+    try {
+      return { ...row, detail: JSON.parse(String(row.detail_json)) as unknown };
+    } catch {
+      return { ...row, detail: {} };
+    }
   }
 }
 
@@ -285,6 +744,8 @@ export function createDomainServices(repo: LibraryRepository, bus?: EventBus) {
     devices: new DeviceService(repo, bus),
     alerts: new AlertService(repo, bus),
     telemetry: new TelemetryService(repo),
+    trace: new TraceService(repo),
+    exports: new ExportService(repo),
     maintenance: new MaintenanceService(repo),
     circulation: new CirculationService(repo, bus),
     rules: new RuleService(repo),

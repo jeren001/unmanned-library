@@ -1,7 +1,7 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import bcrypt from "bcrypt";
-import { createDatabase } from "./persistence/database.js";
+import { createDatabase, ensureAuditLogImmutable } from "./persistence/database.js";
 
 type Row = Record<string, unknown>;
 
@@ -32,13 +32,17 @@ function stamped(row: Row) {
 }
 
 function reset() {
+  // Reseeding is the one place the append-only audit log is cleared; the triggers are restored after the reset.
   db.exec(`
+    DROP TRIGGER IF EXISTS audit_log_no_update;
+    DROP TRIGGER IF EXISTS audit_log_no_delete;
     DELETE FROM audit_log;
     DELETE FROM gate_events;
     DELETE FROM camera_clips;
     DELETE FROM maintenance_records;
     DELETE FROM alerts;
     DELETE FROM telemetry_hourly;
+    DELETE FROM telemetry_archive;
     DELETE FROM telemetry;
     DELETE FROM fines;
     DELETE FROM reservations;
@@ -49,6 +53,7 @@ function reset() {
     DELETE FROM branches;
     DELETE FROM rules;
   `);
+  ensureAuditLogImmutable(db);
 }
 
 function seedRules() {
@@ -202,6 +207,13 @@ function seedTelemetry() {
       }
     }
   }
+  // A few samples older than two years so `npm run archive` has something to move.
+  for (const branch of branches) {
+    for (let day = 0; day < 4; day += 1) {
+      const ts = new Date(now.getTime() - (3 * 365 + day) * 24 * 3600_000);
+      insert("telemetry", stamped({ id: `tel-${branch.code}-old-${day}-temperature`, device_id: `device-${branch.code.toLowerCase()}-5`, branch_id: branch.id, metric: "temperature", value: 20 + day, quality: "ok", ts: iso(ts) }));
+    }
+  }
   db.exec(`
     INSERT INTO telemetry_hourly(branch_id, metric, hour_ts, avg, min, max, count)
     SELECT branch_id, metric, substr(ts, 1, 13) || ':00:00.000Z', avg(value), min(value), max(value), count(*)
@@ -247,5 +259,5 @@ const tx = db.transaction(() => {
 
 tx();
 console.log(`Seeded ${dbFile}`);
-console.log("branches=3 books=300 readers=60 devices=30 loans=1230 telemetry=10800 alerts=40 maintenance=20 clips=15");
+console.log("branches=3 books=300 readers=60 devices=30 loans=1230 telemetry=10812 (12 older than two years) alerts=40 maintenance=20 clips=15");
 db.close();
