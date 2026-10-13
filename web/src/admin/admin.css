@@ -44,6 +44,19 @@
   padding: 4px 8px 14px;
   border-bottom: 1px solid rgba(251, 241, 225, .2);
   margin-bottom: 8px;
+  border-radius: 8px 8px 0 0;
+  color: inherit;
+  text-decoration: none;
+  transition: background-color 200ms ease-out;
+}
+
+.admin-brand:hover {
+  background: rgba(255, 255, 255, .08);
+}
+
+.admin-brand:focus-visible {
+  outline: 3px solid var(--blush);
+  outline-offset: 2px;
 }
 
 .admin-brand b {
@@ -848,9 +861,18 @@
   }
 
   .admin-brand span,
-  .admin-sidebar-user,
   .admin-drawer-link i {
     display: none;
+  }
+
+  /* In the horizontal bar the user block sits at the end instead of the bottom. */
+  .admin-sidebar-user {
+    flex: 0 0 auto;
+    margin: 0 0 0 auto;
+    padding: 0 0 0 10px;
+    border-top: 0;
+    border-left: 1px solid rgba(251, 241, 225, .2);
+    white-space: nowrap;
   }
 
   .admin-sidebar nav {

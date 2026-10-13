@@ -1,6 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { Navigate, NavLink, Route, Routes, useLocation, useNavigate } from "react-router";
+import { Link, Navigate, NavLink, Route, Routes, useLocation, useNavigate } from "react-router";
 import { Button, LangSwitch, SegmentedControl, Skeleton, StatusBadge, ToastProvider, useToast } from "../shared/components";
 import { BellIcon } from "../shared/icons";
 import { BookSpinesBand } from "../shared/motion";
@@ -209,7 +209,11 @@ function AdminShell({ user }: { user: SessionUser }) {
   }, [bellOpen]);
 
   async function signOut() {
-    await logout();
+    try {
+      await logout();
+    } catch {
+      // The session may already be gone; leave the console either way.
+    }
     navigate("/login", { replace: true });
   }
 
@@ -240,10 +244,10 @@ function AdminShell({ user }: { user: SessionUser }) {
     <AdminContext.Provider value={context}>
     <div className="admin-app" data-theme={theme}>
       <aside className="admin-sidebar" aria-label={t("admin.navigation")}>
-        <div className="admin-brand">
+        <Link className="admin-brand" to="/login">
           <b>{t("app.name")}</b>
           <span>{t("admin.console")}</span>
-        </div>
+        </Link>
         <nav>
           {nav.map((item) => (
             <NavLink key={item.key} to={item.path ? `/admin/${item.path}` : "/admin"} end={item.path === ""} className="admin-drawer-link">
@@ -319,7 +323,7 @@ function AdminShell({ user }: { user: SessionUser }) {
               value={theme === "dark" ? t("theme.dark") : t("theme.light")}
               onChange={(label) => setTheme(label === t("theme.dark") ? "dark" : "light")}
             />
-            <Button variant="ghost" onClick={() => void signOut()}>{t("admin.logout")}</Button>
+            <Button variant="ghost" onClick={() => void signOut()}>Log out / 退出</Button>
           </div>
         </header>
 

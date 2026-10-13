@@ -49,6 +49,13 @@
 .wb-title {
   display: grid;
   margin-right: auto;
+  color: inherit;
+  text-decoration: none;
+}
+
+.wb-title:hover b,
+.wb-title:focus-visible b {
+  color: var(--blush);
 }
 
 .wb-title b {
@@ -148,6 +155,28 @@
 .wb-exit:hover,
 .wb-exit:focus-visible {
   color: var(--blush);
+}
+
+.wb-logout {
+  min-height: 2.4rem;
+  padding: 0 1rem;
+  border: 1px solid var(--burgundy);
+  border-radius: 999px;
+  background: var(--burgundy);
+  color: var(--cream);
+  font: inherit;
+  font-size: .85rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 150ms ease-out, background-color 200ms ease-out;
+}
+
+.wb-logout:hover {
+  background: var(--burgundy-deep);
+}
+
+.wb-logout:active {
+  transform: scale(.97);
 }
 
 /* ---------- KPI cards ---------- */

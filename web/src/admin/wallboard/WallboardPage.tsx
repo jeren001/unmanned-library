@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Link } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { useToast } from "../../shared/components";
 import {
-  ackAlert, api, fetchAlerts, fetchBranches, fetchDeviceIndex, fetchOverview,
+  ackAlert, api, fetchAlerts, fetchBranches, fetchDeviceIndex, fetchOverview, logout,
   type AlertFull, type Branch, type DeviceRow, type DeviceStatus, type LoanRow, type Overview
 } from "../adminApi";
 import { errorText } from "../adminUi";
@@ -65,6 +65,7 @@ async function fetchEnvironment(branchId: string): Promise<EnvState> {
 export function WallboardPage() {
   const { t, i18n } = useTranslation();
   const toast = useToast();
+  const navigate = useNavigate();
   const rootRef = useRef<HTMLDivElement>(null);
   const flowRef = useRef<EventFlowHandle>(null);
   const [now, setNow] = useState(() => new Date());
@@ -298,13 +299,22 @@ export function WallboardPage() {
   const sinceEvent = lastEventAt ? Math.max(0, Math.round((now.getTime() - lastEventAt) / 1000)) : null;
   const hasCritical = openAlerts.some((alert) => alert.severity === "critical");
 
+  async function signOut() {
+    try {
+      await logout();
+    } catch {
+      // The session may already be gone; leave the wallboard either way.
+    }
+    navigate("/login", { replace: true });
+  }
+
   return (
     <div ref={rootRef} className="wb-root" data-theme="wallboard">
       <header className="wb-header">
-        <div className="wb-title">
+        <Link className="wb-title" to="/login">
           <b>{t("app.name")}</b>
           <span>{t("admin.wallboard.title")}</span>
-        </div>
+        </Link>
         <label className="wb-branch">
           <span className="qa-sr-only">{t("admin.branch")}</span>
           <select value={branchId} onChange={(event) => setBranchId(event.target.value)}>
@@ -323,6 +333,7 @@ export function WallboardPage() {
           <small>{now.toLocaleDateString(i18n.language, { month: "long", day: "numeric", weekday: "long" })}</small>
         </time>
         <Link className="wb-exit" to="/admin">{t("admin.wallboard.exit")}</Link>
+        <button type="button" className="wb-logout" onClick={() => void signOut()}>Log out / 退出</button>
       </header>
 
       <section className="wb-kpis" aria-label={t("admin.wallboard.kpis")}>

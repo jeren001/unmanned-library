@@ -48,8 +48,12 @@
 }
 
 .kiosk-logo-button {
+  display: inline-flex;
   padding: 0;
+  border-radius: 8px;
   touch-action: none;
+  -webkit-touch-callout: none;
+  user-select: none;
 }
 
 .kiosk-topbar .qa-logo {
@@ -97,8 +101,24 @@
 
 .kiosk-exit {
   min-height: 64px;
-  padding: 0 14px;
-  color: var(--text-2);
+  padding: 0 18px;
+  border: 2px solid var(--accent);
+  border-radius: 12px;
+  color: var(--accent);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  white-space: nowrap;
+  transition: transform 150ms ease-out, background-color 200ms ease-out, color 200ms ease-out;
+}
+
+.kiosk-exit:hover {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.kiosk-exit:active {
+  transform: scale(.97);
 }
 
 .kiosk-exit span,

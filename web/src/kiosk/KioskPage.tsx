@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type Dispatch, type ReactNode, type RefObject } from "react";
+import { Link, useNavigate } from "react-router";
 import { BookSpines, Button, Logo } from "../shared/components";
 import { AlertIcon, CheckIcon, CloseIcon, InfoIcon, OfflineIcon } from "../shared/icons";
 import {
@@ -63,7 +64,9 @@ export function KioskPage() {
   const [warningSeconds, setWarningSeconds] = useState<number | null>(null);
   const [reconcileMessage, setReconcileMessage] = useState("");
   const [policy, setPolicy] = useState({ loanDays: 30, maxLoans: 8, maxRenewals: 2, finePerDayCents: 50 });
+  const navigate = useNavigate();
   const logoPress = useRef<number | undefined>(undefined);
+  const logoLongPressed = useRef(false);
   const identifyRef = useRef<HTMLInputElement>(null);
   const idleScanRef = useRef<HTMLInputElement>(null);
   const lastActivity = useRef(Date.now());
@@ -340,8 +343,22 @@ export function KioskPage() {
   const today = clock.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" });
 
   function startLogoPress() {
-    logoPress.current = window.setTimeout(() => dispatch({ type: "SET_DEV", open: true }), 900);
+    logoLongPressed.current = false;
+    logoPress.current = window.setTimeout(() => {
+      logoLongPressed.current = true;
+      dispatch({ type: "SET_DEV", open: true });
+    }, 900);
   }
+  async function signOut() {
+    try {
+      await logout();
+    } catch {
+      // The session may already be gone (or the kiosk is offline); leave either way.
+    }
+    dispatch({ type: "LOGOUT" });
+    navigate("/login", { replace: true });
+  }
+
   function endLogoPress() {
     if (logoPress.current) window.clearTimeout(logoPress.current);
   }
@@ -349,9 +366,19 @@ export function KioskPage() {
   return (
     <main className="kiosk-page" data-network={state.network}>
       <header className="kiosk-topbar">
-        <button className="kiosk-logo-button" onPointerDown={startLogoPress} onPointerUp={endLogoPress} onPointerLeave={endLogoPress} aria-label="Open developer drawer">
+        {/* Tap goes to /login; a long press still opens the developer drawer. */}
+        <Link
+          to="/login"
+          className="kiosk-logo-button"
+          onPointerDown={startLogoPress}
+          onPointerUp={endLogoPress}
+          onPointerLeave={endLogoPress}
+          onContextMenu={(event) => event.preventDefault()}
+          onClick={(event) => { if (logoLongPressed.current) event.preventDefault(); }}
+          aria-label="登录页 / Login page"
+        >
           <Logo />
-        </button>
+        </Link>
         <div className="kiosk-branch">
           <strong>{state.branchName}</strong>
           <span>OPEN 08:00–22:00 · 今日开放 / Open today</span>
@@ -359,7 +386,7 @@ export function KioskPage() {
         <div className="kiosk-top-actions">
           <button className="kiosk-icon-button" onClick={() => dispatch({ type: "TOGGLE_VOICE" })} aria-label="Toggle voice">{state.voiceEnabled ? "声" : "静"}</button>
           <button className="kiosk-icon-button" onClick={() => dispatch({ type: "NAVIGATE", screen: "help" })} aria-label="Help">?</button>
-          {state.user ? <button className="kiosk-exit" onClick={() => { void logout().catch(() => undefined); dispatch({ type: "LOGOUT" }); }}>{bilingual("退出", "Exit")}</button> : null}
+          <button className="kiosk-exit" onClick={() => void signOut()}>Log out / 退出</button>
         </div>
       </header>
 
