@@ -11,6 +11,8 @@ import "./login.css";
 type Theme = "light" | "dark";
 type StaffRole = Exclude<Role, "reader">;
 type ReaderPhase = "idle" | "reading" | "accepted" | "rejected";
+/** Messages are kept as i18n keys and translated on render, so they follow a later language switch. */
+type Message = { key: string; values?: Record<string, number> };
 
 const THEME_KEY = "ul-login-theme";
 const SIMULATED_CARD = "20240001";
@@ -53,7 +55,10 @@ export function LoginPage() {
     document.documentElement.lang = i18n.language;
   }, [i18n.language]);
 
-  const onSuccess = (user: SessionUser) => setSignedIn(user);
+  const onSuccess = (user: SessionUser) => {
+    if (user.role === "reader") setSignedIn(user);
+    else navigate(destinationFor(user.role), { replace: true, state: { fromLogin: true } });
+  };
 
   return (
     <main className="login-page" data-theme={theme}>
@@ -98,13 +103,17 @@ export function LoginPage() {
 
       {signedIn ? (
         <BookOpening
-          name={signedIn.name}
-          destination={signedIn.role === "reader" ? "kiosk" : "admin"}
+          name={localizedName(t, signedIn.name)}
           onDone={() => navigate(destinationFor(signedIn.role), { replace: true })}
         />
       ) : null}
     </main>
   );
+}
+
+/** The API only has one display name; known accounts get a translated form, anything else is shown as stored. */
+function localizedName(t: ReturnType<typeof useTranslation>["t"], name: string) {
+  return t(`login.userName.${name}`, { defaultValue: name });
 }
 
 function isTextEntry(target: EventTarget | null) {
@@ -117,7 +126,7 @@ function ReaderLogin({ focusOnMount, onSuccess }: { focusOnMount: boolean; onSuc
   const [cardNumber, setCardNumber] = useState("");
   const [phase, setPhase] = useState<ReaderPhase>("idle");
   const [user, setUser] = useState<SessionUser | null>(null);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<Message | null>(null);
   const busy = phase === "reading" || phase === "accepted";
 
   useEffect(() => {
@@ -147,9 +156,9 @@ function ReaderLogin({ focusOnMount, onSuccess }: { focusOnMount: boolean; onSuc
 
   async function scan(number: string) {
     if (busy) return;
-    setError("");
+    setError(null);
     if (!number.trim()) {
-      setError(t("login.error.cardRequired"));
+      setError({ key: "login.error.cardRequired" });
       inputRef.current?.focus();
       return;
     }
@@ -157,9 +166,8 @@ function ReaderLogin({ focusOnMount, onSuccess }: { focusOnMount: boolean; onSuc
     // The card slides into the slot while the request runs; both must finish.
     const [result] = await Promise.allSettled([cardLogin(number), wait(950)]);
     if (result.status === "rejected") {
-      const message = loginErrorMessage(result.reason);
       setPhase("rejected");
-      setError(t(message.key, message.values));
+      setError(loginErrorMessage(result.reason));
       return;
     }
     setUser(result.value);
@@ -202,7 +210,7 @@ function ReaderLogin({ focusOnMount, onSuccess }: { focusOnMount: boolean; onSuc
             ref={inputRef}
             label={t("login.reader.cardLabel")}
             hint={error ? undefined : t("login.reader.cardHint")}
-            error={error || undefined}
+            error={error ? t(error.key, error.values) : undefined}
             mono
             name="cardNumber"
             autoComplete="off"
@@ -230,7 +238,7 @@ function ReaderLogin({ focusOnMount, onSuccess }: { focusOnMount: boolean; onSuc
           </div>
         </form>
         <p className={`login-welcome ${phase === "accepted" ? "is-on" : ""}`} role="status">
-          {phase === "accepted" && user ? <><CheckIcon />{t("login.reader.welcome", { name: user.name })}</> : null}
+          {phase === "accepted" && user ? <><CheckIcon />{t("login.reader.welcome", { name: localizedName(t, user.name) })}</> : null}
         </p>
       </div>
     </div>
@@ -245,15 +253,15 @@ function StaffLogin({ role, onSuccess }: { role: StaffRole; onSuccess: (user: Se
   const [remember, setRemember] = useState(false);
   const [loading, setLoading] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<{ account?: string; password?: string }>({});
-  const [error, setError] = useState<{ text: string; locked: boolean } | null>(null);
+  const [error, setError] = useState<{ message: Message; locked: boolean } | null>(null);
   const [lockedAccount, setLockedAccount] = useState<string | null>(null);
   const isLocked = lockedAccount !== null && lockedAccount === account.trim().toLowerCase();
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
     const missing = {
-      account: account.trim() ? undefined : t("login.error.accountRequired"),
-      password: password ? undefined : t("login.error.passwordRequired")
+      account: account.trim() ? undefined : "login.error.accountRequired",
+      password: password ? undefined : "login.error.passwordRequired"
     };
     setFieldErrors(missing);
     setError(null);
@@ -264,10 +272,9 @@ function StaffLogin({ role, onSuccess }: { role: StaffRole; onSuccess: (user: Se
       const user = await passwordLogin(role, account, password, remember);
       onSuccess(user);
     } catch (caught) {
-      const message = loginErrorMessage(caught);
       const locked = caught instanceof LoginError && caught.code === "ACCOUNT_LOCKED";
       if (locked) setLockedAccount(account.trim().toLowerCase());
-      setError({ text: t(message.key, message.values), locked });
+      setError({ message: loginErrorMessage(caught), locked });
       setPassword("");
       setLoading(false);
     }
@@ -284,7 +291,7 @@ function StaffLogin({ role, onSuccess }: { role: StaffRole; onSuccess: (user: Se
           autoComplete="username"
           placeholder={t("login.staff.accountPlaceholder")}
           value={account}
-          error={fieldErrors.account}
+          error={fieldErrors.account && t(fieldErrors.account)}
           onChange={(event) => setAccount(event.target.value)}
         />
         <div className="login-password">
@@ -294,7 +301,7 @@ function StaffLogin({ role, onSuccess }: { role: StaffRole; onSuccess: (user: Se
             type={showPassword ? "text" : "password"}
             autoComplete="current-password"
             value={password}
-            error={fieldErrors.password}
+            error={fieldErrors.password && t(fieldErrors.password)}
             onChange={(event) => setPassword(event.target.value)}
           />
           <button type="button" className="login-reveal" aria-pressed={showPassword} onClick={() => setShowPassword((value) => !value)}>
@@ -311,7 +318,7 @@ function StaffLogin({ role, onSuccess }: { role: StaffRole; onSuccess: (user: Se
             <AlertIcon />
             <div>
               <strong>{error.locked ? t("login.error.lockedTitle") : t("login.error.title")}</strong>
-              <p>{error.text}</p>
+              <p>{t(error.message.key, error.message.values)}</p>
             </div>
           </div>
         ) : null}

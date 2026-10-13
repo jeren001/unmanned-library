@@ -4,6 +4,7 @@ import { Link, Navigate, NavLink, Route, Routes, useLocation, useNavigate } from
 import { Button, LangSwitch, SegmentedControl, Skeleton, StatusBadge, ToastProvider, useToast } from "../shared/components";
 import { BellIcon } from "../shared/icons";
 import { BookSpinesBand } from "../shared/motion";
+import { NotFoundPage } from "../shared/NotFoundPage";
 import { ApiError, fetchBranches, fetchMe, fetchOpenAlerts, logout, type AlertRow, type Branch, type Role, type SessionUser } from "./adminApi";
 import { ErrorPanel, formatDate } from "./adminUi";
 import { AdminContext, AdminEventHub, type AdminContextValue } from "./adminContext";
@@ -37,6 +38,7 @@ const NAV: NavItem[] = [
 ];
 
 const THEME_KEY = "ul-admin-theme";
+const CLOCK_DRIFT_MS = 2 * 60_000;
 
 // Loaded on demand so ECharts is only downloaded for the wallboard.
 const WallboardPage = lazy(() => import("./wallboard/WallboardPage").then((module) => ({ default: module.WallboardPage })));
@@ -63,6 +65,7 @@ function AdminGate() {
   const { t } = useTranslation();
   const [state, setState] = useState<{ status: "loading" | "ready" | "error"; user?: SessionUser | null; error?: unknown }>({ status: "loading" });
   const [nonce, setNonce] = useState(0);
+  const fromLogin = Boolean((useLocation().state as { fromLogin?: boolean } | null)?.fromLogin);
 
   useEffect(() => {
     let alive = true;
@@ -78,6 +81,8 @@ function AdminGate() {
   }, [nonce]);
 
   if (state.status === "loading") {
+    // Straight from the login form the session check takes a moment; keep the screen blank rather than flash a splash.
+    if (fromLogin) return <main className="admin-splash" aria-busy="true" />;
     return (
       <main className="admin-splash" aria-busy="true">
         <BookSpinesBand count={24} height={40} className="is-small" />
@@ -124,6 +129,8 @@ function AdminShell({ user }: { user: SessionUser }) {
   const location = useLocation();
   const toast = useToast();
   const [theme, setTheme] = useState<Theme>(readTheme);
+  // Signed in just now: fade the console in instead of showing an intermediate screen.
+  const [fromLogin] = useState(() => Boolean((location.state as { fromLogin?: boolean } | null)?.fromLogin));
   const [branches, setBranches] = useState<Branch[]>([]);
   const [branchId, setBranchId] = useState("all");
   const [alerts, setAlerts] = useState<AlertRow[]>([]);
@@ -133,6 +140,8 @@ function AdminShell({ user }: { user: SessionUser }) {
   const [refreshKey, setRefreshKey] = useState(0);
   const bellRef = useRef<HTMLDivElement>(null);
   const hub = useMemo(() => new AdminEventHub(), []);
+  // Only alerts raised after this page opened may toast; older ones live in the bell.
+  const openedAt = useRef(Date.now());
 
   const nav = NAV.filter((item) => item.roles.includes(user.role));
 
@@ -159,7 +168,7 @@ function AdminShell({ user }: { user: SessionUser }) {
     if (typeof EventSource === "undefined") return;
     const stream = new EventSource(`/api/stream${branchId === "all" ? "" : `?branchId=${encodeURIComponent(branchId)}`}`, { withCredentials: true });
     const onRaised = (event: MessageEvent<string>) => {
-      let payload: { message?: string; severity?: string; duplicate?: boolean } = {};
+      let payload: { message?: string; severity?: string; duplicate?: boolean; ts?: string } = {};
       try {
         payload = JSON.parse(event.data);
       } catch {
@@ -168,6 +177,10 @@ function AdminShell({ user }: { user: SessionUser }) {
       refreshAlerts();
       setRefreshKey((value) => value + 1);
       if (payload.duplicate) return;
+      if (payload.severity !== "critical" && payload.severity !== "warning") return;
+      const raisedAt = Date.parse(payload.ts ?? "");
+      // The server no longer replays history to a fresh page; this also guards against old alerts, allowing for clock drift.
+      if (Number.isFinite(raisedAt) && raisedAt < openedAt.current - CLOCK_DRIFT_MS) return;
       setRing((value) => value + 1);
       toast({ tone: "alert", title: t("admin.alerts.new", { severity: t(`admin.severity.${payload.severity ?? "warning"}`) }), body: payload.message });
     };
@@ -242,7 +255,7 @@ function AdminShell({ user }: { user: SessionUser }) {
 
   return (
     <AdminContext.Provider value={context}>
-    <div className="admin-app" data-theme={theme}>
+    <div className={`admin-app ${fromLogin ? "is-entering" : ""}`} data-theme={theme}>
       <aside className="admin-sidebar" aria-label={t("admin.navigation")}>
         <Link className="admin-brand" to="/login">
           <b>{t("app.name")}</b>
@@ -299,10 +312,10 @@ function AdminShell({ user }: { user: SessionUser }) {
             </button>
             {bellOpen ? (
               <div className="admin-bell-panel" role="region" aria-label={t("admin.alerts.title")}>
-                <h3>{t("admin.alerts.title")}</h3>
+                <h3>{t("admin.alerts.title")} <span className="mono">{alerts.length}</span></h3>
                 {alerts.length ? (
                   <ul>
-                    {alerts.slice(0, 6).map((alert) => (
+                    {alerts.map((alert) => (
                       <li key={alert.id}>
                         <StatusBadge tone={alert.severity === "critical" ? "danger" : alert.severity === "warning" ? "warn" : "info"} label={t(`admin.severity.${alert.severity}`)} />
                         <span>{alert.message}</span>
@@ -342,7 +355,7 @@ function AdminShell({ user }: { user: SessionUser }) {
             <Route path="trace" element={<TracePage />} />
             <Route path="exports" element={<ExportsPage />} />
             <Route path="settings/simulator" element={<RequireRole user={user} roles={["admin"]}><SimulatorPage /></RequireRole>} />
-            <Route path="*" element={<Navigate to="/admin" replace />} />
+            <Route path="*" element={<NotFoundPage embedded />} />
           </Routes>
         </main>
       </div>

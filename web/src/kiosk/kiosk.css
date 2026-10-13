@@ -900,25 +900,97 @@
 
 .kiosk-help-steps {
   width: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   border-block: 1px solid var(--line);
 }
 
-.kiosk-help-steps div {
+.kiosk-help-steps li {
   min-height: 140px;
+  padding: 18px 12px;
   display: grid;
-  place-content: center;
-  gap: 10px;
+  justify-items: center;
+  align-content: center;
+  gap: 8px;
 }
 
-.kiosk-help-steps div + div {
+.kiosk-help-steps li + li {
   border-left: 1px solid var(--line);
 }
 
 .kiosk-help-steps b {
   color: var(--wood);
-  font: 48px var(--font-mono);
+  font: 32px var(--font-mono);
+}
+
+.kiosk-help-steps small {
+  display: block;
+  color: var(--text-2);
+  font-size: 15px;
+}
+
+.kiosk-help-art svg {
+  width: 112px;
+  height: 84px;
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.kiosk-help-art .is-fill {
+  fill: var(--accent);
+  stroke: none;
+}
+
+.kiosk-help-art .is-accent {
+  stroke: var(--rose);
+}
+
+.kiosk-help-art .is-dashed {
+  stroke-dasharray: 5 7;
+}
+
+.kiosk-help .kiosk-help-confirm {
+  min-height: 0;
+  scroll-margin-bottom: 112px;
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  color: var(--success);
+  font-size: 21px;
+  font-weight: 700;
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 500ms ease-out, transform 500ms ease-out;
+}
+
+.kiosk-help .kiosk-help-confirm.is-on {
+  padding: 14px 20px;
+  border: 1px solid color-mix(in srgb, var(--success) 35%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--success) 10%, var(--surface));
+  opacity: 1;
+  transform: none;
+}
+
+.kiosk-help .kiosk-help-confirm small {
+  flex-basis: 100%;
+  color: var(--text-2);
+  font-size: 15px;
+  font-weight: 400;
+}
+
+.kiosk-help-confirm svg {
+  width: 24px;
+  height: 24px;
 }
 
 .kiosk-help p {
@@ -934,6 +1006,73 @@
 .kiosk-help .qa-button {
   min-height: 76px;
   font-size: 21px;
+}
+
+/* ---------- Bottom navigation: Back (bottom left) and Home ---------- */
+
+/* Fixed to the viewport so Back is always reachable, however long the screen is. */
+.kiosk-page:has(> .kiosk-nav) {
+  padding-bottom: 96px;
+}
+
+.kiosk-nav {
+  position: fixed;
+  z-index: 10; /* below the timeout dialog (12) and the dev drawer (15) */
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px clamp(18px, 4vw, 56px) 18px;
+  border-top: 1px solid var(--line);
+  background: var(--surface);
+  box-shadow: 0 -8px 24px color-mix(in srgb, var(--ink, #231815) 8%, transparent);
+}
+
+.kiosk-nav button {
+  min-width: 64px;
+  min-height: 64px;
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 22px;
+  border: 2px solid var(--accent);
+  border-radius: 12px;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-size: 20px;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 150ms ease-out, background-color 200ms ease-out, color 200ms ease-out;
+}
+
+.kiosk-nav .kiosk-nav-back {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.kiosk-nav button:hover {
+  background: var(--accent-hover, var(--burgundy-deep));
+  color: var(--accent-ink);
+}
+
+.kiosk-nav button:active {
+  transform: scale(.97);
+}
+
+.kiosk-nav button > span[aria-hidden="true"] {
+  font-size: 26px;
+  line-height: 1;
+}
+
+.kiosk-nav small {
+  display: block;
+  font-size: 13px;
+  font-weight: 400;
+  opacity: .8;
 }
 
 .kiosk-result {
@@ -1218,4 +1357,9 @@
   .kiosk-action-grid b { min-height: 30px; font-size: 28px; }
   .kiosk-action-grid span { font-size: 21px; }
   .kiosk-tray { min-height: 220px; }
+}
+
+@media (max-width: 640px) {
+  .kiosk-help-steps { grid-template-columns: 1fr; }
+  .kiosk-help-steps li + li { border-left: 0; border-top: 1px solid var(--line); }
 }

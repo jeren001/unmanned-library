@@ -311,6 +311,30 @@ CREATE TRIGGER IF NOT EXISTS audit_log_no_delete BEFORE DELETE ON audit_log
 BEGIN SELECT RAISE(ABORT, 'audit_log is append-only'); END;
 `;
 
+/**
+ * Illuminance alert band. Normal indoor readings run from about 20 lux (lights dimmed after hours)
+ * to several hundred lux (reading rooms); only darkness (failed lighting, covered sensor) or
+ * direct-sun glare is worth an alert.
+ */
+export const LIGHT_LUX_THRESHOLD = { min: 10, max: 2000 } as const;
+const OLD_LIGHT_LUX_THRESHOLD = { min: 80, max: 900 };
+
+/** v2: move the original light_lux default (min 80) to the new band, unless someone changed it. */
+function migrateLightLuxThreshold(db: SqliteDatabase) {
+  const row = db.prepare("SELECT value_json FROM rules WHERE key = 'alert_thresholds'").get() as { value_json: string } | undefined;
+  if (!row) return;
+  let thresholds: Record<string, { min?: number; max?: number }>;
+  try {
+    thresholds = JSON.parse(row.value_json);
+  } catch {
+    return;
+  }
+  const lux = thresholds.light_lux;
+  if (!lux || lux.min !== OLD_LIGHT_LUX_THRESHOLD.min || lux.max !== OLD_LIGHT_LUX_THRESHOLD.max) return;
+  thresholds.light_lux = { ...LIGHT_LUX_THRESHOLD };
+  db.prepare("UPDATE rules SET value_json = ?, updated_at = CURRENT_TIMESTAMP WHERE key = 'alert_thresholds'").run(JSON.stringify(thresholds));
+}
+
 export function ensureAuditLogImmutable(db: SqliteDatabase) {
   db.exec(auditLogImmutableSql);
 }
@@ -330,6 +354,12 @@ export function createDatabase(filename = process.env.DB_FILE ?? resolve(process
     transaction();
   }
   db.exec(additiveSql);
+  if (current.version < 2) {
+    db.transaction(() => {
+      migrateLightLuxThreshold(db);
+      db.prepare("INSERT OR IGNORE INTO schema_migrations(version) VALUES (2)").run();
+    })();
+  }
   ensureAuditLogImmutable(db);
   return db;
 }

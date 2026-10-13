@@ -313,8 +313,8 @@ sequenceDiagram
   alt dirty sample
     AR-->>AR: ignore (data is kept but raises no alert)
   else threshold exceeded
-    AR->>AR: de-duplicate: in-memory key branch:device:type<br/>within alert_dedup_seconds (default 60 s)
-    AR->>DB: findRecentOpenAlert(...)
+    AR->>AR: throttle: in-memory key branch:device:type:metric<br/>within alert_dedup_seconds (default 60 s)
+    AR->>DB: findActiveAlert(...): skip while one is open or acked
     AR->>DB: INSERT alerts (smoke → critical, other → warning)
     AR-)B: publish alert.raised
   end

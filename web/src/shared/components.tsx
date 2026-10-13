@@ -389,6 +389,10 @@ export function Toast({ title, body, tone = "info", leaving = false, onClose, on
 
 const ToastContext = createContext<(toast: ToastInput) => void>(() => undefined);
 
+/** At most this many toasts on screen; the oldest makes room for a new one. */
+const MAX_TOASTS = 2;
+const TOAST_DURATION_MS = 5_000;
+
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<ToastItem[]>([]);
   const nextId = useRef(1);
@@ -405,8 +409,17 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
   const push = useCallback((toast: ToastInput) => {
     const id = nextId.current++;
-    setItems((list) => [...list.slice(-3), { ...toast, id, leaving: false }]);
-    timers.current.set(id, window.setTimeout(() => dismiss(id), toast.duration ?? 3600));
+    setItems((list) => {
+      // Toasts already sliding out, and the oldest beyond the cap, go at once so no more than MAX_TOASTS show.
+      const kept = list.filter((item) => !item.leaving).slice(-(MAX_TOASTS - 1));
+      for (const item of list) {
+        if (kept.includes(item)) continue;
+        window.clearTimeout(timers.current.get(item.id));
+        timers.current.delete(item.id);
+      }
+      return [...kept, { ...toast, id, leaving: false }];
+    });
+    timers.current.set(id, window.setTimeout(() => dismiss(id), toast.duration ?? TOAST_DURATION_MS));
   }, [dismiss]);
 
   useEffect(() => {

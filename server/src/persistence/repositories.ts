@@ -438,16 +438,17 @@ export class LibraryRepository {
     `).all(alertId) as Array<{ kind: string; actor_id: string | null; message: string; ts: string }>;
     return [...events, ...notes].sort((left, right) => String(left.ts).localeCompare(String(right.ts)));
   }
-  findRecentOpenAlert(input: { branchId: string; deviceId?: string | null; type: string; since: string }) {
+  /** An unresolved (open or acknowledged) alert of this kind, however old; `messagePrefix` narrows `threshold` alerts to one metric. */
+  findActiveAlert(input: { branchId: string; deviceId?: string | null; type: string; messagePrefix?: string }) {
     return this.db.prepare(`
       SELECT * FROM alerts
-      WHERE status = 'open'
+      WHERE status IN ('open', 'acked')
         AND branch_id = @branchId
         AND type = @type
-        AND created_at >= @since
         AND ((@deviceId IS NULL AND device_id IS NULL) OR device_id = @deviceId)
+        AND (@messagePrefix IS NULL OR substr(message, 1, length(@messagePrefix)) = @messagePrefix)
       ORDER BY created_at DESC LIMIT 1
-    `).get({ ...input, deviceId: input.deviceId ?? null }) as Record<string, unknown> | undefined;
+    `).get({ ...input, deviceId: input.deviceId ?? null, messagePrefix: input.messagePrefix ?? null }) as Record<string, unknown> | undefined;
   }
   maintenanceList(query: MaintenanceQuery = {}) {
     const where: string[] = [];

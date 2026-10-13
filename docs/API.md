@@ -1259,12 +1259,15 @@ and `offset`.
 
 Alert rules are loaded from the `rules` table. `alert_thresholds.smoke_ppm.max`
 creates a critical `smoke` alert when exceeded; temperature and humidity
-thresholds create warning `threshold` alerts when out of band;
+thresholds create warning `threshold` alerts when out of band (the seeded
+`light_lux` band is `10`–`2000` lux: normal indoor light, about 20 lux after
+hours to several hundred in reading rooms, raises nothing);
 `heartbeat_missed_intervals` defaults to `3` and creates `device_offline` when
 that many heartbeats are missed; unauthorized gate events or `RFID-UNKNOWN*`
-tags create `theft` alerts linked to the nearest camera clip. Repeated open
-alerts for the same branch, device, and type are de-duplicated for
-`alert_dedup_seconds` or 60 seconds by default.
+tags create `theft` alerts linked to the nearest camera clip. While an alert
+for the same branch, device and type (and metric, for `threshold`) is still
+open or acknowledged, no new one is raised; bursts before the first alert is
+stored are also throttled for `alert_dedup_seconds` (60 seconds by default).
 
 ### `GET /api/exports/preview`
 
@@ -1968,7 +1971,9 @@ simulation tick interval is the configured base interval divided by `speed`.
 
 ## Simulator Scenarios
 
-The simulator starts unless `SIMULATOR_ENABLED=false`. It uses
+The simulator is off by default. It starts when an admin presses Start on
+Settings · Simulator (`POST /api/simulator/start`), or with the server when
+`SIMULATOR_ENABLED=true`. It uses
 `SIMULATOR_INTERVAL_MS` default `5000` and `SIMULATOR_SEED` default `42`.
 
 | Scenario | Behavior |

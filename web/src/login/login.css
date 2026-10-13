@@ -499,15 +499,35 @@
 .login-open-tile.is-wood { background: var(--wood); color: var(--cream); }
 
 .login-open-enter {
-  margin-top: 8px;
-  border: 0;
-  background: transparent;
-  color: var(--accent);
-  font-size: 14px;
-  font-weight: 600;
-  text-decoration: underline;
-  text-underline-offset: 3px;
+  position: absolute;
+  z-index: 2;
+  left: 50%;
+  bottom: max(32px, env(safe-area-inset-bottom, 0px));
+  translate: -50% 0;
+  min-height: 46px;
+  padding: 0 24px;
+  border: 2px solid var(--burgundy);
+  border-radius: 12px;
+  background: var(--cream);
+  color: var(--burgundy);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
   cursor: pointer;
+  transition: transform 150ms ease-out, background-color 200ms ease-out;
+}
+
+.login-open-enter:hover {
+  background: #FFFFFF;
+}
+
+.login-open-enter:active {
+  transform: scale(.97);
+}
+
+.login-open-enter:focus-visible {
+  outline: 3px solid var(--rose);
+  outline-offset: 2px;
 }
 
 .login-open-cover {

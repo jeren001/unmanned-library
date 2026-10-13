@@ -16,7 +16,7 @@ export class AlertRulesEngine {
     if (event.quality === "dirty") return;
     if (threshold && ((threshold.min !== undefined && event.value < threshold.min) || (threshold.max !== undefined && event.value > threshold.max))) {
       const severity = event.metric === "smoke_ppm" ? "critical" : "warning";
-      this.raise(event.branchId, event.deviceId, event.metric === "smoke_ppm" ? "smoke" : "threshold", severity, `${event.metric} threshold exceeded: ${event.value}`, event.ts);
+      this.raise(event.branchId, event.deviceId, event.metric === "smoke_ppm" ? "smoke" : "threshold", severity, `${event.metric} threshold exceeded: ${event.value}`, event.ts, undefined, `${event.metric} `);
     }
   }
   private gate(event: GatePassedEvent) {
@@ -32,14 +32,17 @@ export class AlertRulesEngine {
       this.raise(event.branchId, event.deviceId, "device_offline", "warning", `Device offline: ${event.deviceId}`, event.ts);
     }
   }
-  private raise(branchId: string, deviceId: string, type: AlertType, severity: AlertSeverity, message: string, ts: string, clipId?: string) {
-    const key = `${branchId}:${deviceId}:${type}`;
+  /**
+   * De-duplication: one alert per branch, device, type (and metric, for `threshold`) while it is unresolved.
+   * The in-memory window additionally throttles bursts before the first alert is written.
+   */
+  private raise(branchId: string, deviceId: string, type: AlertType, severity: AlertSeverity, message: string, ts: string, clipId?: string, metricPrefix?: string) {
+    const key = `${branchId}:${deviceId}:${type}:${metricPrefix ?? ""}`;
     const dedupMs = this.dedupWindowMs();
     const last = this.recent.get(key) ?? 0;
     const timestamp = Number.isFinite(Date.parse(ts)) ? Date.parse(ts) : Date.now();
     if (timestamp - last < dedupMs) return;
-    const since = new Date(timestamp - dedupMs).toISOString();
-    if (this.repo.findRecentOpenAlert({ branchId, deviceId, type, since })) {
+    if (this.repo.findActiveAlert({ branchId, deviceId, type, messagePrefix: metricPrefix })) {
       this.recent.set(key, timestamp);
       return;
     }

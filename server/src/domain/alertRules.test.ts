@@ -70,4 +70,33 @@ describe("AlertRulesEngine", () => {
     expect(events).toEqual(expect.arrayContaining(["gate.passed", "alert.raised", "alert.acked", "alert.resolved"]));
     db.close();
   });
+
+  it("keeps one alert per device and metric while it is unresolved, however long the breach lasts", async () => {
+    const { db, repo, bus } = setup();
+    repo.upsertRule("alert_thresholds", { light_lux: { min: 10, max: 2000 }, temperature: { min: 10, max: 32 } }, "test");
+    const sample = (metric: string, value: number, minutesFromNow: number) => ({ deviceId: "device-1", branchId: "branch-1", metric, value, quality: "ok" as const, ts: new Date(Date.now() + minutesFromNow * 60_000).toISOString(), source: "test" });
+    const threshold = () => repo.alertList({ type: "threshold", limit: 50 }) as Array<{ id: string; message: string }>;
+
+    for (let minute = 0; minute < 30; minute += 5) await bus.publish("telemetry.received", sample("light_lux", 2, minute));
+    expect(threshold()).toHaveLength(1);
+    // A different metric on the same device is a separate problem.
+    await bus.publish("telemetry.received", sample("temperature", 40, 31));
+    expect(threshold().map((alert) => alert.message.split(" ")[0]).sort()).toEqual(["light_lux", "temperature"]);
+    // Once resolved, a new breach raises a new alert.
+    const lux = threshold().find((alert) => alert.message.startsWith("light_lux"))!;
+    repo.update("alerts", lux.id, { status: "resolved" });
+    await bus.publish("telemetry.received", sample("light_lux", 2, 40));
+    expect(threshold().filter((alert) => alert.message.startsWith("light_lux"))).toHaveLength(2);
+    db.close();
+  });
+
+  it("does not alert on normal indoor light levels", async () => {
+    const { db, repo, bus } = setup();
+    repo.upsertRule("alert_thresholds", { light_lux: { min: 10, max: 2000 } }, "test");
+    for (const value of [20, 35, 50, 65, 300, 800]) {
+      await bus.publish("telemetry.received", { deviceId: "device-1", branchId: "branch-1", metric: "light_lux", value, quality: "ok" as const, ts: new Date().toISOString(), source: "test" });
+    }
+    expect(repo.alertList({ type: "threshold", limit: 10 })).toHaveLength(0);
+    db.close();
+  });
 });

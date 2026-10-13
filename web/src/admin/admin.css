@@ -9,6 +9,14 @@
   color: var(--text);
 }
 
+.admin-app.is-entering {
+  animation: admin-enter 250ms ease-out both;
+}
+
+@keyframes admin-enter {
+  from { opacity: 0; }
+}
+
 .admin-splash {
   min-height: 100vh;
   display: grid;
@@ -308,6 +316,18 @@
 .admin-bell-panel h3 {
   margin: 0 0 8px;
   font-size: 16px;
+}
+
+.admin-bell-panel h3 span {
+  color: var(--text-2);
+  font-size: 13px;
+}
+
+/* The bell holds every open alert; the list scrolls instead of being cut to the newest few. */
+.admin-bell-panel ul {
+  max-height: min(360px, 55vh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .admin-bell-panel ul,
@@ -895,7 +915,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .admin-bell svg.is-ringing {
+  .admin-bell svg.is-ringing,
+  .admin-app.is-entering {
     animation: none;
   }
 }

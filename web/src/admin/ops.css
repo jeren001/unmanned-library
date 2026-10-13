@@ -606,6 +606,35 @@
   grid-column: 1 / -1;
 }
 
+/* Simulator event log: a ruled paper slip with burgundy ink rather than a terminal. Same in light and dark. */
+.admin-app .admin-sim-log .admin-test-log {
+  max-height: 240px;
+  padding: 10px 14px 10px 22px;
+  border: 1px solid #E6D6BE;
+  border-left: 3px double #D6384F;
+  background-color: var(--paper);
+  background-image: repeating-linear-gradient(to bottom, transparent 0 23px, rgba(142, 27, 46, .09) 23px 24px);
+  background-attachment: local;
+  color: #5A1220;
+  font-size: 12.5px;
+  line-height: 24px;
+}
+
+.admin-app .admin-sim-log .admin-test-log li {
+  padding: 0;
+}
+
+.admin-app .admin-sim-log .admin-test-log li span {
+  color: #8A7A6A;
+  opacity: 1;
+}
+
+.admin-app .admin-sim-log .admin-test-log li.is-ok { color: #5A1220; }
+.admin-app .admin-sim-log .admin-test-log li.is-ok span::before { content: "✓ "; color: #276E50; }
+.admin-app .admin-sim-log .admin-test-log li.is-fail { color: #A3233A; font-weight: 700; }
+.admin-app .admin-sim-log .admin-test-log li.is-fail span::before { content: "✕ "; color: #A3233A; }
+.admin-app .admin-sim-log .admin-test-log li.admin-muted { color: #8A7A6A; font-style: italic; }
+
 .admin-sim-row {
   display: flex;
   align-items: center;

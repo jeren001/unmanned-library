@@ -18,8 +18,10 @@ export function createServer(filename?: string) {
   const telemetryPipeline = new TelemetryPipeline(persistence.repo, bus);
   const services = createDomainServices(persistence.repo, bus);
   const rules = new AlertRulesEngine(persistence.repo, bus);
+  // Off by default: an admin starts it on Settings · Simulator, or SIMULATOR_ENABLED=true starts it with the server.
+  const simulatorAutostart = process.env.SIMULATOR_ENABLED === "true";
   const simulator = new LibrarySimulator(persistence.repo, bus, {
-    enabled: process.env.SIMULATOR_ENABLED !== "false",
+    enabled: simulatorAutostart,
     intervalMs: Number(process.env.SIMULATOR_INTERVAL_MS ?? 5_000),
     seed: Number(process.env.SIMULATOR_SEED ?? 42)
   }, telemetryPipeline);
@@ -97,7 +99,7 @@ export function createServer(filename?: string) {
   app.locals.simulator = simulator;
   app.locals.alertRules = rules;
   app.locals.telemetryPipeline = telemetryPipeline;
-  if (process.env.SIMULATOR_ENABLED !== "false") simulator.start();
+  if (simulatorAutostart) simulator.start();
 
   return app;
 }

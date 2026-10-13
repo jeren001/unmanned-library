@@ -13,8 +13,11 @@ function branchOf(event: EventEnvelope, branchId?: string) {
 export function streamEvents(req: Request, res: Response, bus: EventBus) {
   const branchId = typeof req.query.branchId === "string" ? req.query.branchId : undefined;
   const topics = typeof req.query.topics === "string" ? new Set(req.query.topics.split(",") as EventName[]) : undefined;
-  const requestedAfter = Number(req.header("Last-Event-ID") ?? req.query.after ?? 0);
-  const after = Number.isFinite(requestedAfter) ? requestedAfter : 0;
+  // Replay only for a reconnect (Last-Event-ID) or an explicit ?after=; a fresh page gets live events,
+  // so old alerts are not re-announced every time the console opens.
+  const resumeFrom = req.header("Last-Event-ID") ?? (typeof req.query.after === "string" ? req.query.after : undefined);
+  const requestedAfter = resumeFrom === undefined ? Number.NaN : Number(resumeFrom);
+  const replay = Number.isFinite(requestedAfter);
   res.status(200);
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
@@ -33,7 +36,7 @@ export function streamEvents(req: Request, res: Response, bus: EventBus) {
     if (replaying) pending.push(event);
     else write(event);
   }, { name: "api.sse" });
-  for (const event of bus.replaySince(after)) write(event);
+  if (replay) for (const event of bus.replaySince(requestedAfter)) write(event);
   replaying = false;
   for (const event of pending.sort((left, right) => left.seq - right.seq)) write(event);
   const heartbeat = setInterval(() => res.write(`: keepalive ${Date.now()}\n\n`), 15_000);

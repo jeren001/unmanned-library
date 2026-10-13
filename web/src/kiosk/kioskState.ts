@@ -1,4 +1,8 @@
 export type KioskScreen = "idle" | "identify" | "home" | "borrow" | "return" | "renew" | "reserve" | "loans" | "help" | "result";
+
+export const KIOSK_SCREENS: readonly KioskScreen[] = ["idle", "identify", "home", "borrow", "return", "renew", "reserve", "loans", "help", "result"];
+/** Screens that show a reader's data; without a signed-in reader they have nothing to render. */
+const READER_SCREENS: readonly KioskScreen[] = ["home", "borrow", "return", "renew", "reserve", "loans"];
 export type FlowKind = "borrow" | "return" | "renew" | "reserve";
 export type BorrowStep = "scan" | "confirm" | "receipt";
 
@@ -66,6 +70,8 @@ export type KioskState = {
   voiceEnabled: boolean;
   soundEnabled: boolean;
   devOpen: boolean;
+  /** Where Back on the help screen returns to, so opening help never discards a flow in progress. */
+  helpReturn: KioskScreen | null;
 };
 
 export const initialKioskState: KioskState = {
@@ -88,7 +94,8 @@ export const initialKioskState: KioskState = {
   capacity: 40,
   voiceEnabled: true,
   soundEnabled: false,
-  devOpen: typeof window !== "undefined" && new URLSearchParams(window.location.search).get("dev") === "1"
+  devOpen: typeof window !== "undefined" && new URLSearchParams(window.location.search).get("dev") === "1",
+  helpReturn: null
 };
 
 export type KioskAction =
@@ -96,6 +103,8 @@ export type KioskAction =
   | { type: "LOGIN"; user: KioskUser }
   | { type: "LOGOUT" }
   | { type: "NAVIGATE"; screen: Exclude<KioskScreen, "idle" | "identify" | "result"> }
+  | { type: "BACK" }
+  | { type: "HOME" }
   | { type: "SET_BOOKS"; books: Book[] }
   | { type: "SET_LOANS"; loans: Loan[] }
   | { type: "SET_SELECTED_LOANS"; ids: string[] }
@@ -114,15 +123,61 @@ export type KioskAction =
   | { type: "TOGGLE_VOICE" }
   | { type: "TOGGLE_SOUND" };
 
+/** The screen to land on when the current one cannot be shown: home for a signed-in reader, otherwise idle. */
+function fallback(state: KioskState): KioskState {
+  if (!state.user) return { ...initialKioskState, network: state.network, outboxCount: state.outboxCount, devOpen: state.devOpen, voiceEnabled: state.voiceEnabled, soundEnabled: state.soundEnabled };
+  return { ...state, screen: "home", flow: null, borrowStep: "scan", result: null, error: "", inputError: "", selectedLoanIds: [], helpReturn: null };
+}
+
+/** Every state must map to a screen; anything that would render nothing goes to the fallback instead. */
+export function ensureScreen(state: KioskState): KioskState {
+  if (!KIOSK_SCREENS.includes(state.screen)) return fallback(state);
+  if (READER_SCREENS.includes(state.screen) && !state.user) return fallback(state);
+  if (state.screen === "result" && !state.result) return fallback(state);
+  return state;
+}
+
+function openHelp(state: KioskState): KioskState {
+  if (state.screen === "help") return state;
+  return { ...state, screen: "help", helpReturn: state.screen, error: "", inputError: "" };
+}
+
+/** One step back in the current flow. Never signs the reader out. */
+function back(state: KioskState): KioskState {
+  switch (state.screen) {
+    case "identify":
+      return { ...state, screen: "idle", error: "", inputError: "" };
+    case "help":
+      return { ...state, screen: state.helpReturn ?? (state.user ? "home" : "idle"), helpReturn: null, error: "", inputError: "" };
+    case "borrow":
+      if (state.borrowStep === "confirm") return { ...state, borrowStep: "scan", error: "", inputError: "" };
+      return fallback(state);
+    case "idle":
+    case "home":
+      return state;
+    default:
+      return fallback(state);
+  }
+}
+
 export function kioskReducer(state: KioskState, action: KioskAction): KioskState {
+  return ensureScreen(reduce(state, action));
+}
+
+function reduce(state: KioskState, action: KioskAction): KioskState {
   switch (action.type) {
     case "SHOW_IDENTIFY":
       return { ...state, screen: "identify", error: "", inputError: "" };
     case "LOGIN":
-      return { ...state, user: action.user, screen: "home", error: "", inputError: "", result: null };
+      return { ...state, user: action.user, screen: "home", error: "", inputError: "", result: null, helpReturn: null };
     case "LOGOUT":
       return { ...initialKioskState, network: state.network, outboxCount: state.outboxCount, devOpen: state.devOpen };
+    case "BACK":
+      return back(state);
+    case "HOME":
+      return fallback(state);
     case "NAVIGATE":
+      if (action.screen === "help") return openHelp(state);
       return {
         ...state,
         screen: action.screen,
@@ -132,7 +187,8 @@ export function kioskReducer(state: KioskState, action: KioskAction): KioskState
         error: "",
         inputError: "",
         selectedLoanIds: [],
-        scannedBookIds: action.screen === "borrow" ? [] : state.scannedBookIds
+        scannedBookIds: action.screen === "borrow" ? [] : state.scannedBookIds,
+        helpReturn: null
       };
     case "SET_BOOKS":
       return { ...state, books: action.books, inputError: "" };

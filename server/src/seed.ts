@@ -1,7 +1,7 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import bcrypt from "bcrypt";
-import { createDatabase, ensureAuditLogImmutable } from "./persistence/database.js";
+import { createDatabase, ensureAuditLogImmutable, LIGHT_LUX_THRESHOLD } from "./persistence/database.js";
 
 type Row = Record<string, unknown>;
 
@@ -63,7 +63,7 @@ function seedRules() {
     ["max_renewals", 2, "Maximum renewals per loan"],
     ["fine_per_day_cents", 50, "Overdue fine per day"],
     ["overdue_grace_days", 1, "Grace period before fines apply"],
-    ["alert_thresholds", { temperature: { min: 10, max: 32 }, humidity: { min: 25, max: 75 }, smoke_ppm: { max: 8 }, light_lux: { min: 80, max: 900 } }, "Telemetry thresholds"]
+    ["alert_thresholds", { temperature: { min: 10, max: 32 }, humidity: { min: 25, max: 75 }, smoke_ppm: { max: 8 }, light_lux: LIGHT_LUX_THRESHOLD }, "Telemetry thresholds"]
   ] as const;
   for (const [key, value, description] of rules) insert("rules", stamped({ key, value_json: JSON.stringify(value), description }));
 }
