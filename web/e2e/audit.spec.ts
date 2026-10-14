@@ -259,12 +259,12 @@ test("kiosk 1080x1920", async ({ browser }) => {
   await audit(page, "kiosk-identify");
   await page.getByLabel("Reader card number").fill("20240001");
   await page.getByRole("button", { name: /继续|Continue/ }).click();
-  await expect(page.getByRole("heading", { name: /欢迎回来/ })).toBeVisible();
+  await expect(page.locator(".kiosk-catalog")).toBeVisible();
   await settle(page);
   await audit(page, "kiosk-home", { focus: true });
-  const screens: Array<[string, RegExp]> = [["borrow", /借阅.*Borrow/], ["return", /归还.*Return/], ["renew", /续借.*Renew/], ["reserve", /预约.*Reserve/], ["loans", /我的借阅.*My loans/]];
-  for (const [name, button] of screens) {
-    await page.getByRole("button", { name: button }).first().click();
+  const screens: Array<[string, string]> = [["borrow", "[data-service=borrow]"], ["return", "[data-service=return]"], ["renew", "[data-service=renew]"], ["reserve", "[data-service=reserve]"], ["loans", ".kiosk-my-loans-head button"]];
+  for (const [name, selector] of screens) {
+    await page.locator(selector).click();
     await settle(page);
     await audit(page, `kiosk-${name}`, { focus: name === "borrow" });
     await page.getByRole("button", { name: "返回 / Back" }).click();
@@ -288,7 +288,7 @@ test("prefers-reduced-motion leaves no decorative animation running", async ({ b
   await page.getByRole("button", { name: /继续|Continue/ }).click();
   await settle(page, 1500);
   result.kioskHome = await runningAnimations(page);
-  await page.getByRole("button", { name: /借阅.*Borrow/ }).first().click();
+  await page.locator("[data-service=borrow]").click();
   await settle(page, 1500);
   result.kioskBorrow = await runningAnimations(page);
   await kiosk.close();
@@ -354,7 +354,7 @@ test("kiosk frame rate", async ({ browser }) => {
     await page.getByLabel("Reader card number").fill("20240001");
     await page.getByRole("button", { name: /继续|Continue/ }).click();
   });
-  await measure("borrow", async () => { await page.getByRole("button", { name: /借阅.*Borrow/ }).first().click(); });
+  await measure("borrow", async () => { await page.locator("[data-service=borrow]").click(); });
   await measure("add-book", async () => {
     await page.getByPlaceholder("RFID-000001 / ISBN").fill("RFID-000003");
     await page.getByRole("button", { name: /添加.*Add/ }).click();

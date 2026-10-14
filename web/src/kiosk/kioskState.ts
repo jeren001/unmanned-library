@@ -67,7 +67,6 @@ export type KioskState = {
   branchId: string;
   occupancy: number;
   capacity: number;
-  voiceEnabled: boolean;
   soundEnabled: boolean;
   devOpen: boolean;
   /** Where Back on the help screen returns to, so opening help never discards a flow in progress. */
@@ -92,7 +91,6 @@ export const initialKioskState: KioskState = {
   branchId: "branch-east",
   occupancy: 7,
   capacity: 40,
-  voiceEnabled: true,
   soundEnabled: false,
   devOpen: typeof window !== "undefined" && new URLSearchParams(window.location.search).get("dev") === "1",
   helpReturn: null
@@ -120,12 +118,11 @@ export type KioskAction =
   | { type: "SET_NETWORK"; network: KioskState["network"] }
   | { type: "SET_OUTBOX_COUNT"; count: number }
   | { type: "SET_DEV"; open: boolean }
-  | { type: "TOGGLE_VOICE" }
   | { type: "TOGGLE_SOUND" };
 
 /** The screen to land on when the current one cannot be shown: home for a signed-in reader, otherwise idle. */
 function fallback(state: KioskState): KioskState {
-  if (!state.user) return { ...initialKioskState, network: state.network, outboxCount: state.outboxCount, devOpen: state.devOpen, voiceEnabled: state.voiceEnabled, soundEnabled: state.soundEnabled };
+  if (!state.user) return { ...initialKioskState, network: state.network, outboxCount: state.outboxCount, devOpen: state.devOpen, soundEnabled: state.soundEnabled };
   return { ...state, screen: "home", flow: null, borrowStep: "scan", result: null, error: "", inputError: "", selectedLoanIds: [], helpReturn: null };
 }
 
@@ -225,8 +222,6 @@ function reduce(state: KioskState, action: KioskAction): KioskState {
       return { ...state, outboxCount: action.count };
     case "SET_DEV":
       return { ...state, devOpen: action.open };
-    case "TOGGLE_VOICE":
-      return { ...state, voiceEnabled: !state.voiceEnabled };
     case "TOGGLE_SOUND":
       return { ...state, soundEnabled: !state.soundEnabled };
     default:

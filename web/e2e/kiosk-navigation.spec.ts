@@ -16,7 +16,13 @@ const screen = (page: Page) => page.locator("main.kiosk-page > section");
 const back = (page: Page) => page.locator(".kiosk-nav-back");
 const home = (page: Page) => page.locator(".kiosk-nav-home");
 const helpButton = (page: Page) => page.getByRole("button", { name: "Help", exact: true });
-const tile = (page: Page, name: RegExp) => page.locator(".kiosk-action-grid button").filter({ hasText: name });
+type Entry = "borrow" | "return" | "renew" | "reserve" | "loans" | "help";
+/** How each screen is opened from home: service tiles, the "My loans" panel, or the "?" button. */
+const open = (page: Page, entry: Entry) =>
+  entry === "loans" ? page.locator(".kiosk-my-loans-head button").click()
+    : entry === "help" ? helpButton(page).click()
+      : page.locator(`[data-service=${entry}]`).click();
+const homeScreen = (page: Page) => page.locator(".kiosk-catalog");
 
 /** Exactly one non-empty screen is on the page, plus the expected navigation buttons. */
 async function expectScreen(page: Page, label: string, nav: { back: boolean; home: boolean }) {
@@ -39,7 +45,7 @@ async function signIn(page: Page) {
   await page.getByRole("button", { name: /请刷读者证|Tap your card/ }).click();
   await page.getByLabel("Reader card number").fill("20240001");
   await page.getByRole("button", { name: /继续|Continue/ }).click();
-  await expect(page.getByRole("heading", { name: /欢迎回来/ })).toBeVisible();
+  await expect(homeScreen(page)).toBeVisible();
 }
 
 async function placeBookAndReview(page: Page) {
@@ -86,19 +92,8 @@ test("reader screens: every flow, help and Back/Home keep a screen and the sessi
   await signIn(page);
   await expectScreen(page, "home", { back: false, home: false });
 
-  const voice = page.getByRole("button", { name: "Voice on" });
-  await voice.click();
-  await expect(page.getByRole("button", { name: "Voice off" })).toBeVisible();
-
-  for (const [name, pattern] of [
-    ["borrow", /借阅.*Borrow/],
-    ["return", /归还.*Return/],
-    ["renew", /续借.*Renew/],
-    ["reserve", /预约.*Reserve/],
-    ["loans", /我的借阅.*My loans/],
-    ["help", /帮助.*Help/]
-  ] as const) {
-    await tile(page, pattern).click();
+  for (const name of ["borrow", "return", "renew", "reserve", "loans", "help"] as const) {
+    await open(page, name);
     await expectScreen(page, name, { back: true, home: true });
     const title = (await page.locator(".kiosk-shell-heading h1").textContent()) ?? "";
 
@@ -114,19 +109,19 @@ test("reader screens: every flow, help and Back/Home keep a screen and the sessi
 
     // The top arrow, the bottom Back and Home all land on a rendered home screen.
     await page.locator(".kiosk-back").click();
-    await expect(page.getByRole("heading", { name: /欢迎回来/ })).toBeVisible();
+    await expect(homeScreen(page)).toBeVisible();
     await expectScreen(page, `${name} → top arrow`, { back: false, home: false });
-    await tile(page, pattern).click();
+    await open(page, name);
     await back(page).click();
     await expectScreen(page, `${name} → Back`, { back: false, home: false });
-    await tile(page, pattern).click();
+    await open(page, name);
     await home(page).click();
-    await expect(page.getByRole("heading", { name: /欢迎回来/ })).toBeVisible();
+    await expect(homeScreen(page)).toBeVisible();
     await expectScreen(page, `${name} → Home`, { back: false, home: false });
   }
 
   // Borrow step by step: Back goes one step, help keeps the flow, Cancel leaves it.
-  await tile(page, /借阅.*Borrow/).click();
+  await open(page, "borrow");
   await placeBookAndReview(page);
   await expectScreen(page, "borrow step 2", { back: true, home: true });
   await helpButton(page).click();
@@ -140,11 +135,11 @@ test("reader screens: every flow, help and Back/Home keep a screen and the sessi
   await page.getByRole("button", { name: /取消.*Cancel/ }).click();
   await expectScreen(page, "borrow step 2 → Cancel", { back: false, home: false });
 
-  await tile(page, /借阅.*Borrow/).click();
+  await open(page, "borrow");
   await page.getByRole("button", { name: /取消.*Cancel/ }).click();
   await expectScreen(page, "borrow step 1 → Cancel", { back: false, home: false });
 
-  await tile(page, /借阅.*Borrow/).click();
+  await open(page, "borrow");
   await placeBookAndReview(page);
   await page.getByRole("button", { name: /借阅并开闸.*Borrow & exit/ }).click();
   await expect(page.getByText(/借阅成功|Borrowed|已保存/).first()).toBeVisible();
@@ -153,11 +148,11 @@ test("reader screens: every flow, help and Back/Home keep a screen and the sessi
   await back(page).click();
   await expectScreen(page, "receipt → help → Back", { back: true, home: true });
   await back(page).click();
-  await expect(page.getByRole("heading", { name: /欢迎回来/ })).toBeVisible();
+  await expect(homeScreen(page)).toBeVisible();
   await expectScreen(page, "receipt → Back", { back: false, home: false });
 
   // Return the book just borrowed, covering the return result screen.
-  await tile(page, /归还.*Return/).click();
+  await open(page, "return");
   await page.locator(".kiosk-shell").getByRole("button", { name: /归还.*Return/ }).last().click();
   await expect(page.getByText(/归还成功|Returned|归还已保存/).first()).toBeVisible();
   await expectScreen(page, "return result", { back: true, home: true });
@@ -165,7 +160,7 @@ test("reader screens: every flow, help and Back/Home keep a screen and the sessi
   await expectScreen(page, "return result → Back", { back: false, home: false });
 
   // Home help: confirmation stays on the help screen.
-  await tile(page, /帮助.*Help/).click();
+  await open(page, "help");
   await page.getByRole("button", { name: /呼叫远程支持/ }).click();
   await expect(page.locator(".kiosk-help-confirm")).toContainText(/已呼叫远程支持|请求已记录/);
   await expectScreen(page, "help → call support", { back: true, home: true });

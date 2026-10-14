@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type Dispatch, type ReactNode, type RefObject } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate } from "react-router";
-import { BookSpines, Button, Logo } from "../shared/components";
+import { BookSpines, Button, LangSwitch, Logo } from "../shared/components";
 import { AlertIcon, CheckIcon, CloseIcon, InfoIcon, OfflineIcon } from "../shared/icons";
 import {
   borrowBook, cachedBooks, cachedRules, getRules, getStats, listBooks, listLoans, loginCard,
@@ -12,6 +12,7 @@ import {
 } from "./kioskState";
 import { BorrowFlow, BorrowReceipt } from "./BorrowFlow";
 import { LoansFlow, RenewFlow, ReserveFlow, ReturnFlow, ReturnResult } from "./LoanFlows";
+import { KioskHome } from "./KioskHome";
 import { overdueDays } from "./kioskUi";
 import "./kiosk.css";
 
@@ -35,10 +36,6 @@ function bilingual(zh: string, en: string) {
 function formatDate(value?: string) {
   if (!value) return "--";
   return new Intl.DateTimeFormat("zh-CN", { month: "short", day: "numeric" }).format(new Date(value));
-}
-
-function daysUntil(value: string) {
-  return Math.ceil((new Date(value).getTime() - Date.now()) / 86400000);
 }
 
 function errorMessage(error: unknown) {
@@ -72,15 +69,6 @@ export function KioskPage() {
   const identifyRef = useRef<HTMLInputElement>(null);
   const idleScanRef = useRef<HTMLInputElement>(null);
   const lastActivity = useRef(Date.now());
-
-  const speak = useCallback((zh: string, en: string) => {
-    if (!state.voiceEnabled || !("speechSynthesis" in window)) return;
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(`${zh}. ${en}`);
-    utterance.lang = "zh-CN";
-    utterance.rate = 0.92;
-    window.speechSynthesis.speak(utterance);
-  }, [state.voiceEnabled]);
 
   const refreshLoans = useCallback(async () => {
     try {
@@ -167,22 +155,6 @@ export function KioskPage() {
       window.removeEventListener("offline", offline);
     };
   }, [refreshOutbox]);
-
-  useEffect(() => {
-    const prompt: Record<KioskScreen, [string, string]> = {
-      idle: ["请刷读者证或扫码入馆", "Tap your card or scan QR to enter"],
-      identify: ["请刷读者证，或输入证号和 PIN", "Tap your card, or enter card number and PIN"],
-      borrow: ["请将图书放在 RFID 托盘上", "Place books on the RFID tray"],
-      return: ["请将要归还的图书放在托盘上", "Place books to return on the tray"],
-      renew: ["选择要续借的图书", "Choose books to renew"],
-      reserve: ["搜索并预约一本已借出的图书", "Search and reserve a borrowed book"],
-      loans: ["这是您的借阅记录", "Here are your loans"],
-      help: ["请选择需要的帮助", "Choose the help you need"],
-      home: ["请选择一项服务", "Choose a service"],
-      result: ["操作已完成，请取走图书", "Done. Please take your books"]
-    };
-    speak(...prompt[state.screen]);
-  }, [speak, state.screen]);
 
   useEffect(() => {
     if (state.screen === "idle") {
@@ -332,6 +304,23 @@ export function KioskPage() {
     }
   }
 
+  /** Home catalogue search: the books API, or the cached catalogue when offline. */
+  async function searchCatalogue(query: string) {
+    try {
+      return await listBooks(query);
+    } catch {
+      const needle = query.toLowerCase();
+      const books = state.books.length ? state.books : await cachedBooks();
+      return books.filter((book) => [book.title, book.author, book.isbn].some((field) => field?.toLowerCase().includes(needle)));
+    }
+  }
+
+  function reserveFromSearch(book: Book) {
+    setReserveInput(book.title);
+    setSearchResults([book]);
+    go("reserve");
+  }
+
   async function callSupport() {
     setBusy(true);
     try {
@@ -345,9 +334,6 @@ export function KioskPage() {
   }
 
   const activeLoans = useMemo(() => state.loans.filter((loan) => ["active", "overdue"].includes(loan.status)), [state.loans]);
-  const openLoans = activeLoans.filter((loan) => loan.status === "active").length;
-  const overdueLoans = activeLoans.filter((loan) => loan.status === "overdue").length;
-  const dueSoon = activeLoans.filter((loan) => loan.status === "active" && daysUntil(loan.due_at) <= 7).length;
   const today = clock.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" });
 
   function startLogoPress() {
@@ -372,7 +358,7 @@ export function KioskPage() {
   }
 
   const idleScreen = <IdleScreen time={today} occupancy={state.occupancy} capacity={state.capacity} onStart={() => dispatch({ type: "SHOW_IDENTIFY" })} scanRef={idleScanRef} onScan={(value) => { setCard(value); dispatch({ type: "SHOW_IDENTIFY" }); }} />;
-  const homeScreen = state.user ? <HomeScreen user={state.user.name} openLoans={openLoans} dueSoon={dueSoon} overdue={overdueLoans} onNavigate={go} /> : null;
+  const homeScreen = state.user ? <KioskHome user={state.user.name} loans={activeLoans} onNavigate={go} onSearch={searchCatalogue} onReserve={reserveFromSearch} /> : null;
 
   return (
     <main className="kiosk-page" data-network={state.network}>
@@ -395,7 +381,7 @@ export function KioskPage() {
           <span>OPEN 08:00–22:00 · 今日开放 / Open today</span>
         </div>
         <div className="kiosk-top-actions">
-          <button className="kiosk-icon-button" onClick={() => dispatch({ type: "TOGGLE_VOICE" })} aria-label={state.voiceEnabled ? "Voice on" : "Voice off"} aria-pressed={state.voiceEnabled}>{state.voiceEnabled ? "声" : "静"}</button>
+          <div className="kiosk-lang"><LangSwitch /></div>
           <button className="kiosk-icon-button" onClick={() => dispatch({ type: "NAVIGATE", screen: "help" })} aria-label="Help">?</button>
           <button className="kiosk-exit" onClick={() => void signOut()}>Log out / 退出</button>
         </div>
@@ -497,24 +483,6 @@ function IdentifyScreen({ card, pin, setCard, setPin, onSubmit, error, inputRef,
       {error ? <p className="kiosk-error" role="alert"><AlertIcon />{error}</p> : null}
       <Button loading={loading} onClick={onSubmit}>{bilingual("继续", "Continue")}</Button>
       <p className="kiosk-hint">支持读者证、二维码和键盘扫码器<br /><small>Cards, QR codes, and keyboard barcode scanners supported</small></p>
-    </div>
-  </KioskShell>;
-}
-
-function HomeScreen({ user, openLoans, dueSoon, overdue, onNavigate }: { user: string; openLoans: number; dueSoon: number; overdue: number; onNavigate: (screen: Exclude<KioskScreen, "idle" | "identify" | "result">) => void }) {
-  const actions: Array<{ screen: Exclude<KioskScreen, "idle" | "identify" | "result">; zh: string; en: string; mark: string }> = [
-    { screen: "borrow", zh: "借阅", en: "Borrow", mark: "+" },
-    { screen: "return", zh: "归还", en: "Return", mark: "↩" },
-    { screen: "renew", zh: "续借", en: "Renew", mark: "↻" },
-    { screen: "reserve", zh: "预约", en: "Reserve", mark: "□" },
-    { screen: "loans", zh: "我的借阅", en: "My loans", mark: "≡" },
-    { screen: "help", zh: "帮助", en: "Help", mark: "?" }
-  ];
-  return <KioskShell title={{ zh: `你好，${user}`, en: `Hello, ${user}` }} onBack={undefined}>
-    <div className="kiosk-home">
-      <div className="kiosk-greeting"><h1>欢迎回来<small>Welcome back</small></h1><p>选择一项服务，整个过程不到 30 秒<br /><span>Choose a service. Most tasks take under 30 seconds.</span></p></div>
-      <div className="kiosk-summary"><div><strong>{openLoans}</strong><span>借阅中 / Active</span></div><div className={dueSoon ? "is-warn" : ""}><strong>{dueSoon}</strong><span>即将到期 / Due soon</span></div><div className={overdue ? "is-danger" : ""}><strong>{overdue}</strong><span>逾期 / Overdue</span></div></div>
-      <div className="kiosk-action-grid">{actions.map((action) => <button key={action.screen} onClick={() => onNavigate(action.screen)}><b aria-hidden="true">{action.mark}</b><span>{action.zh}</span><small>{action.en}</small></button>)}</div>
     </div>
   </KioskShell>;
 }

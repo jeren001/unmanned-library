@@ -1,0 +1,363 @@
+/* Kiosk home as an electronic catalogue (docs/reference/library-ux-motion.html §2, docs/MOTION_SPEC.md K2–K7).
+   Tile and badge colours are the concept's raw palette, so they read the same in every kiosk theme. */
+
+.kiosk-catalog {
+  width: min(100%, 1420px);
+  flex: 1;
+  min-height: 0;
+  margin: 0 auto;
+  padding: 24px clamp(18px, 4vw, 56px) 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.kiosk-catalog-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px 24px;
+}
+
+.kiosk-catalog-head h1 {
+  margin: 0;
+  color: var(--accent);
+  font: 600 clamp(30px, 3.4vw, 42px)/1.1 var(--font-serif);
+}
+
+.kiosk-catalog-head p {
+  margin: 0;
+  color: var(--text-2);
+  font-size: 18px;
+}
+
+/* ---------- Catalogue search ---------- */
+
+.kiosk-catalog-search {
+  position: relative;
+  z-index: 4;
+}
+
+.kiosk-catalog-search form {
+  min-height: 76px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 10px 0 22px;
+  border: 2px solid var(--burgundy);
+  border-radius: 18px;
+  background: #FFFFFF;
+  transition: box-shadow 200ms ease-out;
+}
+
+.kiosk-catalog-search form:focus-within {
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--rose) 28%, transparent);
+}
+
+.kiosk-catalog-search svg {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  fill: none;
+  stroke: var(--burgundy);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.kiosk-catalog-search input {
+  min-width: 0;
+  min-height: 64px;
+  flex: 1;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 22px;
+}
+
+.kiosk-catalog-search input::placeholder {
+  color: #8B7C6C;
+}
+
+.kiosk-catalog-search input::-webkit-search-cancel-button {
+  display: none;
+}
+
+.kiosk-catalog-clear {
+  min-height: 56px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 12px;
+  background: #F1E4CC;
+  color: var(--burgundy);
+  font: inherit;
+  font-size: 17px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.kiosk-catalog-results {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  max-height: min(52vh, 520px);
+  overflow-y: auto;
+  padding: 6px 18px;
+  border: 1px solid #E6D6BE;
+  border-top: 4px solid var(--burgundy);
+  border-radius: 16px;
+  background: var(--paper);
+  box-shadow: 0 22px 48px rgba(35, 24, 21, .18);
+}
+
+.kiosk-catalog-results ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.kiosk-catalog-results li {
+  min-height: 76px;
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 0;
+  color: var(--ink);
+}
+
+.kiosk-catalog-results li + li {
+  border-top: 1px dashed #E6D6BE;
+}
+
+.kiosk-catalog-results li > i {
+  align-self: stretch;
+  border-radius: 2px;
+}
+
+.kiosk-catalog-results strong {
+  display: block;
+  font: 600 20px var(--font-serif);
+}
+
+.kiosk-catalog-results li div > span {
+  color: #6B5F52;
+  font-size: 15px;
+}
+
+.kiosk-catalog-results li button {
+  min-height: 56px;
+  padding: 0 20px;
+  border: 2px solid var(--burgundy);
+  border-radius: 12px;
+  background: transparent;
+  color: var(--burgundy);
+  font: inherit;
+  font-size: 17px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.kiosk-catalog-note {
+  margin: 14px 0;
+  color: #6B5F52;
+  font-size: 17px;
+}
+
+/* ---------- Services + My loans ---------- */
+
+.kiosk-catalog-grid {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+  gap: 18px;
+}
+
+.kiosk-services {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+  grid-template-rows: minmax(170px, 1.35fr) minmax(140px, 1fr);
+  gap: 14px;
+}
+
+.kiosk-service {
+  min-height: 140px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 20px 22px;
+  border: 0;
+  border-radius: 20px;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 180ms ease-out, box-shadow 180ms ease-out;
+}
+
+.kiosk-service:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 10px 24px rgba(35, 24, 21, .12);
+}
+
+.kiosk-service:active {
+  transform: scale(.98);
+}
+
+.kiosk-service:focus-visible {
+  outline: 3px solid var(--rose);
+  outline-offset: 3px;
+}
+
+.kiosk-service b {
+  font: 700 clamp(36px, 3.6vw, 48px)/1 var(--font-serif);
+}
+
+.kiosk-service span {
+  font-size: 16px;
+  opacity: .88;
+}
+
+/* Borrow is the main task: burgundy and the largest tile (wider column, taller row). */
+.kiosk-service.is-borrow { background: var(--burgundy); color: var(--cream); }
+.kiosk-service.is-borrow b { font-size: clamp(44px, 4.6vw, 64px); }
+.kiosk-service.is-return { background: var(--blush); color: var(--ink); }
+.kiosk-service.is-renew { background: #FFFFFF; color: var(--burgundy); box-shadow: inset 0 0 0 2px #E6D6BE; }
+.kiosk-service.is-renew:hover { box-shadow: inset 0 0 0 2px #E6D6BE, 0 10px 24px rgba(35, 24, 21, .12); }
+.kiosk-service.is-reserve { background: var(--wood); color: var(--cream); }
+
+.kiosk-my-loans {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 18px 20px;
+  border: 1px solid #E6D6BE;
+  border-radius: 18px;
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.kiosk-my-loans-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.kiosk-my-loans h2 {
+  margin: 0;
+  font: 600 24px var(--font-serif);
+}
+
+.kiosk-my-loans-head button {
+  min-height: 56px;
+  padding: 0 18px;
+  border: 2px solid #E6D6BE;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--burgundy);
+  font: inherit;
+  font-size: 17px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.kiosk-my-loans-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  color: #6B5F52;
+  font-size: 16px;
+}
+
+.kiosk-my-loans-stats .is-soon { color: var(--wood); font-weight: 700; }
+.kiosk-my-loans-stats .is-late { color: var(--burgundy); font-weight: 700; }
+
+.kiosk-my-loans-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.kiosk-my-loans-list li {
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border-top: 1px dashed #E6D6BE;
+  font-size: 18px;
+}
+
+.kiosk-my-loans-list li > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kiosk-my-loans-empty,
+.kiosk-my-loans-more {
+  margin: 0;
+  color: #6B5F52;
+  font-size: 16px;
+}
+
+/* Due badges: concept colours (soon = wood, ok = green, overdue = burgundy with a slow halo pulse). */
+.kiosk-due {
+  position: relative;
+  flex: 0 0 auto;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.kiosk-due.is-ok { background: #DDEFE5; color: #276E50; }
+.kiosk-due.is-soon { background: #F6E3D3; color: #8A4B2A; }
+.kiosk-due.is-late { background: #F4D6D9; color: var(--burgundy); }
+
+.kiosk-due.is-late::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: 0 0 0 5px rgba(142, 27, 46, .18);
+  opacity: 0;
+  pointer-events: none;
+  animation: kiosk-due-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes kiosk-due-pulse {
+  50% { opacity: 1; }
+}
+
+/* Single column (narrow or portrait): tiles keep their own height instead of stretching to fill the screen. */
+@media (max-width: 900px), (orientation: portrait) and (max-width: 1100px) {
+  .kiosk-catalog-grid { flex: 0 0 auto; grid-template-columns: 1fr; align-content: start; }
+  .kiosk-services { grid-template-rows: minmax(240px, auto) minmax(190px, auto); }
+}
+
+/* Phone: Borrow takes the full first row and stays the tallest; the other three share the second row. */
+@media (max-width: 560px) {
+  .kiosk-services { grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: minmax(150px, auto) minmax(120px, auto); gap: 10px; }
+  .kiosk-service.is-borrow { grid-column: 1 / -1; }
+  .kiosk-service { min-height: 120px; padding: 14px 12px; }
+  .kiosk-service b { font-size: 28px; }
+  .kiosk-service span { font-size: 13px; }
+  .kiosk-catalog-results li { grid-template-columns: 8px minmax(0, 1fr) auto; }
+  .kiosk-catalog-results li button { grid-column: 2 / -1; justify-self: start; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kiosk-due.is-late::after { animation: none; opacity: 1; }
+  .kiosk-service,
+  .kiosk-service:hover { transition: none; transform: none; }
+}

@@ -5,7 +5,7 @@
  */
 
 import {
-  api, fetchAlerts, fetchDeviceIndex, getBook, getReader, withMock,
+  api, ApiError, fetchAlerts, fetchDeviceIndex, getBook, getReader, withMock,
   type AlertFull, type BookRow, type DeviceRow, type LoanRow, type MaintenanceRow, type ReaderRow, type RuleRow
 } from "./adminApi";
 
@@ -196,7 +196,7 @@ export async function scanAll<T>(path: string, params: Record<string, string> = 
 
 export type TraceDeviceEvent = {
   at: string;
-  kind: "borrow" | "renew" | "return" | "overdue" | "lost" | "maintenance";
+  kind: "borrow" | "renew" | "return" | "overdue" | "lost" | "maintenance" | "gate_in" | "gate_out";
   deviceId?: string | null;
   detail?: string;
   /** Derived from loan fields rather than a recorded device event. */
@@ -211,9 +211,25 @@ export type TraceChain = {
   reader: ReaderRow | null;
   device: DeviceRow | null;
   deviceEvents: TraceDeviceEvent[];
-  /** Alerts linked to the loan, then alerts on the loan's device during the loan. */
-  alerts: Array<AlertFull & { link: "loan" | "device" }>;
+  /** Alerts linked to the loan, then alerts on the loan's device (or clip, or branch) during the loan. */
+  alerts: Array<AlertFull & { link: TraceAlertLink }>;
+  /** Camera clips covering the loan window (from GET /api/trace). */
+  clips?: TraceClip[];
+  /** Maintenance opened for the chain's alerts (from GET /api/trace). */
+  maintenance?: TraceMaintenance[];
   simulated?: boolean;
+};
+
+export type TraceAlertLink = "loan" | "device" | "clip" | "window";
+export type TraceClip = { id: string; device_id: string | null; device_name?: string | null; branch_id: string; start_ts: string; end_ts: string; file_path?: string | null };
+export type TraceMaintenance = MaintenanceRow & { device_name?: string | null; status?: "open" | "completed" };
+
+/** One step of GET /api/trace (docs/API.md). */
+export type ServerTraceStep = {
+  order: number;
+  kind: "book" | "rfid_tag" | "loan_transaction" | "device_event" | "camera_clip" | "alert" | "maintenance";
+  ts: string;
+  record: Record<string, unknown>;
 };
 
 export function loanWindow(loan: TraceLoan, now = Date.now()) {
@@ -249,6 +265,32 @@ export function alertsFor(loan: TraceLoan, alerts: AlertFull[], now = Date.now()
   return [...linked, ...onDevice.sort((a, b) => a.created_at.localeCompare(b.created_at))];
 }
 
+/**
+ * Maps the server's flat chain onto the page's shape. Reader, device and the book's other loans
+ * are looked up separately; device events are the loan's derived events plus recorded gate passes.
+ */
+export function fromServerTrace(steps: ServerTraceStep[], now = Date.now()) {
+  const of = (kind: ServerTraceStep["kind"]) => steps.filter((step) => step.kind === kind).map((step) => step.record);
+  const book = of("book")[0] as unknown as BookRow | undefined;
+  if (!book) throw new Error("Trace response has no book step");
+  const loan = (of("loan_transaction")[0] as unknown as TraceLoan | undefined) ?? null;
+  const clips = of("camera_clip") as unknown as TraceClip[];
+  const maintenance = of("maintenance") as unknown as TraceMaintenance[];
+  const gates: TraceDeviceEvent[] = of("device_event")
+    .filter((event) => event.source !== "loan")
+    .map((event) => ({ at: String(event.ts), kind: event.direction === "in" ? "gate_in" as const : "gate_out" as const, deviceId: (event.device_id as string | null) ?? null, detail: (event.device_name as string | undefined) ?? undefined }));
+  const clipIds = new Set(clips.map((clip) => clip.id));
+  const alerts = (of("alert") as unknown as AlertFull[]).map((alert) => ({
+    ...alert,
+    link: (loan && alert.related_loan_id === loan.id ? "loan"
+      : alert.related_clip_id && clipIds.has(alert.related_clip_id) ? "clip"
+        : loan?.device_id && alert.device_id === loan.device_id ? "device"
+          : "window") as TraceAlertLink
+  }));
+  const deviceEvents = loan ? [...deviceEventsFor(loan, [], now), ...gates].sort((a, b) => a.at.localeCompare(b.at)) : gates;
+  return { book, loan, clips, maintenance, alerts, deviceEvents };
+}
+
 export const searchBooks = (q: string) =>
   api<{ data: BookRow[] }>(`/api/books?${new URLSearchParams({ q, limit: "12" }).toString()}`).then((body) => body.data);
 
@@ -258,15 +300,37 @@ export async function findLoan(id: string) {
 }
 
 /**
- * GET /api/trace?bookId=…&loanId=… is requested (API_REQUESTS #11). The mock joins books,
- * loans, readers, devices, maintenance and alerts; device events are derived from the loan.
+ * GET /api/trace?book=…|loanId=… (docs/API.md). A domain "not found" becomes TraceNotFound so the page
+ * shows an empty state. On a server without the route, the mock joins books, loans, readers, devices,
+ * maintenance and alerts; device events are derived from the loan.
  */
 export function fetchTrace(bookId: string, loanId?: string | null): Promise<TraceChain> {
-  return withMock(
-    () => {
-      const params = new URLSearchParams({ bookId });
-      if (loanId) params.set("loanId", loanId);
-      return api<{ data: TraceChain }>(`/api/trace?${params.toString()}`).then((body) => body.data);
+  return withMock<TraceChain>(
+    async () => {
+      // The server takes exactly one of book (id, ISBN, RFID tag or title), loanId or alertId.
+      const params = new URLSearchParams(loanId ? { loanId } : { book: bookId });
+      let steps: ServerTraceStep[];
+      try {
+        steps = (await api<{ data: { chain: ServerTraceStep[] } }>(`/api/trace?${params.toString()}`)).data.chain;
+      } catch (error) {
+        if (error instanceof ApiError && error.code === "TRACE_NOT_FOUND") throw new TraceNotFound(loanId ? "loan" : "book", loanId ?? bookId);
+        throw error;
+      }
+      const trace = fromServerTrace(steps);
+      const { book, loan } = trace;
+      const [loans, reader, devices] = await Promise.all([
+        scanLoans()
+          .then((all) => all.filter((item) => item.book_id === book.id).sort((a, b) => b.borrowed_at.localeCompare(a.borrowed_at)))
+          .catch(() => [] as TraceLoan[]),
+        loan ? getReader(loan.user_id) : Promise.resolve(null),
+        loan?.device_id ? fetchDeviceIndex("all").catch(() => new Map<string, DeviceRow>()) : Promise.resolve(new Map<string, DeviceRow>())
+      ]);
+      return {
+        ...trace,
+        loans: loan && !loans.some((item) => item.id === loan.id) ? [loan, ...loans] : loans,
+        reader,
+        device: loan?.device_id ? devices.get(loan.device_id) ?? null : null
+      };
     },
     async () => {
       const [book, allLoans] = await Promise.all([getBook(bookId), scanLoans()]);

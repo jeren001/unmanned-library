@@ -87,6 +87,21 @@
   gap: 8px;
 }
 
+.kiosk-lang {
+  flex: 0 0 auto;
+}
+
+.kiosk-lang .qa-segmented button {
+  min-height: 48px;
+  padding: 0 14px;
+}
+
+/* Phone: the branch line yields to the controls so Log out stays fully visible. */
+@media (max-width: 560px) {
+  .kiosk-branch { display: none; }
+  .kiosk-lang .qa-segmented button { min-height: 44px; padding: 0 10px; font-size: 13px; }
+}
+
 .kiosk-icon-button {
   width: 64px;
   height: 64px;
@@ -443,127 +458,6 @@
   width: 24px;
   height: 24px;
   flex: 0 0 auto;
-}
-
-.kiosk-home {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: clamp(20px, 4vh, 38px);
-}
-
-.kiosk-greeting {
-  display: flex;
-  align-items: end;
-  justify-content: space-between;
-  gap: 24px;
-}
-
-.kiosk-greeting h1 {
-  margin: 0;
-  font: 600 46px/1.05 var(--font-serif);
-}
-
-.kiosk-greeting h1 small {
-  display: block;
-  margin-top: 8px;
-  color: var(--text-2);
-  font: 500 17px var(--font-sans);
-}
-
-.kiosk-greeting p {
-  margin: 0;
-  color: var(--text-2);
-  text-align: right;
-  line-height: 1.5;
-}
-
-.kiosk-greeting p span {
-  font-size: 15px;
-}
-
-.kiosk-summary {
-  display: flex;
-  gap: 0;
-  border-block: 1px solid var(--line);
-  background: color-mix(in srgb, var(--surface) 72%, transparent);
-}
-
-.kiosk-summary > div {
-  min-width: 0;
-  flex: 1;
-  min-height: 86px;
-  padding: 12px 22px;
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.kiosk-summary > div + div {
-  border-left: 1px solid var(--line);
-}
-
-.kiosk-summary strong {
-  color: var(--accent);
-  font: 600 38px var(--font-mono);
-}
-
-.kiosk-summary span {
-  color: var(--text-2);
-  font-size: 17px;
-}
-
-.kiosk-summary .is-warn strong { color: var(--warn); }
-.kiosk-summary .is-danger strong { color: var(--danger); }
-
-.kiosk-action-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14px;
-}
-
-.kiosk-action-grid button {
-  min-height: clamp(132px, 19vh, 188px);
-  padding: 20px 22px;
-  display: grid;
-  align-content: center;
-  justify-items: start;
-  gap: 5px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: var(--surface);
-  color: var(--text);
-  cursor: pointer;
-  text-align: left;
-  transition: border-color 180ms ease-out, background-color 180ms ease-out, transform 180ms ease-out;
-}
-
-.kiosk-action-grid button:active {
-  transform: translateY(2px);
-}
-
-.kiosk-action-grid button:first-child {
-  border-color: var(--accent);
-  background: var(--accent);
-  color: var(--accent-ink);
-}
-
-.kiosk-action-grid b {
-  min-height: 42px;
-  color: var(--wood);
-  font: 500 38px/1 var(--font-mono);
-}
-
-.kiosk-action-grid button:first-child b { color: var(--blush); }
-
-.kiosk-action-grid span {
-  font: 600 27px var(--font-serif);
-}
-
-.kiosk-action-grid small {
-  font-size: 15px;
-  opacity: .78;
 }
 
 .kiosk-flow {
@@ -1245,14 +1139,6 @@
     width: min(100%, 1600px);
   }
 
-  .kiosk-home {
-    gap: 20px;
-  }
-
-  .kiosk-action-grid button {
-    min-height: clamp(104px, 16vh, 150px);
-  }
-
   .kiosk-flow {
     width: min(100%, 1320px);
   }
@@ -1284,15 +1170,12 @@
 @media (orientation: portrait) and (min-height: 1200px) {
   .kiosk-topbar { min-height: 108px; }
   .kiosk-shell { padding-top: 42px; }
-  .kiosk-home { justify-content: flex-start; gap: 40px; padding-top: 36px; }
   /* Idle: the shelf art becomes a top band and the copy gets the full width, so the title
      stays on one line and the start button does not wrap. */
   .kiosk-idle { grid-template-columns: 1fr; grid-template-rows: minmax(0, .9fr) minmax(0, 1.1fr); }
   .kiosk-idle-art { order: -1; min-height: 0; }
   .kiosk-idle-art .qa-spines { height: min(30vh, 520px); }
   .kiosk-idle-copy { align-self: center; padding: 48px 72px; }
-  .kiosk-action-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .kiosk-action-grid button { min-height: 280px; }
   .kiosk-tray { min-height: 330px; }
 }
 
@@ -1313,16 +1196,6 @@
   .kiosk-start { min-height: 72px; padding: 10px 16px; }
   .kiosk-shell { padding: 16px 14px 20px; }
   .kiosk-shell-heading h1 { font-size: 30px; }
-  .kiosk-greeting { align-items: start; flex-direction: column; gap: 10px; }
-  .kiosk-greeting p { text-align: left; font-size: 16px; }
-  .kiosk-summary > div { min-height: 72px; padding: 8px; gap: 6px; flex-direction: column; align-items: flex-start; }
-  .kiosk-summary strong { font-size: 28px; }
-  .kiosk-summary span { font-size: 12px; }
-  .kiosk-action-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-  .kiosk-action-grid button { min-height: 124px; padding: 12px; }
-  .kiosk-action-grid span { font-size: 22px; }
-  .kiosk-action-grid b { min-height: 32px; font-size: 30px; }
-  .kiosk-action-grid small { font-size: 12px; }
   .kiosk-identify { padding: 18px 0; }
   .kiosk-tray { padding: 14px; min-height: 250px; }
   .kiosk-tray h2 { font-size: 22px; }
@@ -1349,13 +1222,6 @@
   .kiosk-shell { padding-top: 12px; padding-bottom: 14px; }
   .kiosk-shell-heading { min-height: 58px; }
   .kiosk-shell-heading h1 { font-size: 28px; }
-  .kiosk-home { gap: 14px; }
-  .kiosk-greeting h1 { font-size: 34px; }
-  .kiosk-summary > div { min-height: 64px; }
-  .kiosk-summary strong { font-size: 30px; }
-  .kiosk-action-grid button { min-height: 100px; padding: 12px 16px; }
-  .kiosk-action-grid b { min-height: 30px; font-size: 28px; }
-  .kiosk-action-grid span { font-size: 21px; }
   .kiosk-tray { min-height: 220px; }
 }
 

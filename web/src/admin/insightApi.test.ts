@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AlertFull, MaintenanceRow, RuleRow } from "./adminApi";
 import {
-  alertsFor, axisDomain, bucketize, collectExport, deviceEventsFor, exportFilename, fetchTelemetrySeries, inRange,
-  parseThresholds, placeFlagged, type TelemetrySample, type TraceLoan
+  alertsFor, axisDomain, bucketize, collectExport, deviceEventsFor, exportFilename, fetchTelemetrySeries, fetchTrace, fromServerTrace, inRange,
+  parseThresholds, placeFlagged, TraceNotFound, type ServerTraceStep, type TelemetrySample, type TraceLoan
 } from "./insightApi";
 import { buildXlsx, columnName, crc32, escapeXml, sheetName } from "./xlsx";
 
@@ -157,5 +157,59 @@ describe("xlsx", () => {
     expect(text).toContain('<c r="A2" t="inlineStr"><is><t xml:space="preserve">loan-1 &lt;x&gt;</t></is></c><c r="B2"><v>2</v></c>');
     expect(text).toContain("借阅");
     expect(text).toContain('<autoFilter ref="A1:B3"/>');
+  });
+});
+
+describe("trace from GET /api/trace", () => {
+  const loan = { id: "loan-00009", book_id: "book-0049", user_id: "reader-001", branch_id: "branch-east", device_id: "device-kiosk", borrowed_at: "2026-10-01T09:00:00.000Z", due_at: "2026-10-31T09:00:00.000Z", returned_at: null, renew_count: 0, status: "active" };
+  const steps: ServerTraceStep[] = [
+    { order: 1, kind: "book", ts: "2026-01-01T00:00:00.000Z", record: { id: "book-0049", title: "软件体系结构", isbn: "978-7-111-54493-7", rfid_tag: "RFID-000010", branch_id: "branch-east" } },
+    { order: 2, kind: "rfid_tag", ts: "2026-01-01T00:00:00.000Z", record: { tag: "RFID-000010", book_id: "book-0049" } },
+    { order: 3, kind: "loan_transaction", ts: loan.borrowed_at, record: loan },
+    { order: 4, kind: "device_event", ts: loan.borrowed_at, record: { source: "loan", device_id: "device-kiosk", ts: loan.borrowed_at } },
+    { order: 5, kind: "device_event", ts: "2026-10-01T09:02:00.000Z", record: { device_id: "device-gate", device_name: "East gate", direction: "out", ts: "2026-10-01T09:02:00.000Z" } },
+    { order: 6, kind: "camera_clip", ts: "2026-10-01T09:01:00.000Z", record: { id: "clip-1", device_id: "device-camera", branch_id: "branch-east", start_ts: "2026-10-01T09:01:00.000Z", end_ts: "2026-10-01T09:03:00.000Z" } },
+    { order: 7, kind: "alert", ts: "2026-10-01T09:02:00.000Z", record: { id: "alert-1", related_loan_id: "loan-00009", related_clip_id: "clip-1", device_id: "device-gate", created_at: "2026-10-01T09:02:00.000Z" } },
+    { order: 8, kind: "alert", ts: "2026-10-01T09:05:00.000Z", record: { id: "alert-2", related_clip_id: "clip-1", device_id: "device-gate", created_at: "2026-10-01T09:05:00.000Z" } },
+    { order: 9, kind: "alert", ts: "2026-10-01T09:06:00.000Z", record: { id: "alert-3", device_id: "device-kiosk", created_at: "2026-10-01T09:06:00.000Z" } },
+    { order: 10, kind: "alert", ts: "2026-10-01T09:07:00.000Z", record: { id: "alert-4", device_id: "device-light", created_at: "2026-10-01T09:07:00.000Z" } },
+    { order: 11, kind: "maintenance", ts: "2026-10-01T10:00:00.000Z", record: { id: "maint-1", related_alert_id: "alert-1", description: "Recalibrate", started_at: "2026-10-01T10:00:00.000Z" } }
+  ];
+
+  it("maps every step of the server chain onto the page's shape", () => {
+    const trace = fromServerTrace(steps, Date.parse("2026-10-05T00:00:00Z"));
+    expect(trace.book.id).toBe("book-0049");
+    expect(trace.loan?.id).toBe("loan-00009");
+    expect(trace.clips.map((clip) => clip.id)).toEqual(["clip-1"]);
+    expect(trace.maintenance.map((item) => item.id)).toEqual(["maint-1"]);
+    expect(trace.alerts.map((alert) => [alert.id, alert.link])).toEqual([["alert-1", "loan"], ["alert-2", "clip"], ["alert-3", "device"], ["alert-4", "window"]]);
+    expect(trace.deviceEvents.map((event) => event.kind)).toEqual(["borrow", "gate_out"]);
+  });
+
+  it.each([
+    ["a title, ISBN, RFID tag or book ID", "软件体系结构", null, "book=%E8%BD%AF%E4%BB%B6%E4%BD%93%E7%B3%BB%E7%BB%93%E6%9E%84"],
+    ["a loan ID", "book-0049", "loan-00009", "loanId=loan-00009"]
+  ])("asks the server with the parameter it accepts for %s", async (_label, book, loanId, expected) => {
+    const urls: string[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      urls.push(url);
+      if (url.startsWith("/api/trace")) return json(200, { data: { input: {}, window: {}, chain: steps } });
+      if (url.startsWith("/api/loans")) return json(200, { data: [loan] });
+      if (url.startsWith("/api/readers/")) return json(200, { data: { id: "reader-001", display_name: "林知秋", card_no: "20240001" } });
+      if (url.startsWith("/api/devices")) return json(200, { data: [{ id: "device-kiosk", branch_id: "branch-east", kind: "kiosk", name: "East kiosk" }] });
+      return json(404, { code: "ROUTE_MISSING" });
+    }));
+    const chain = await fetchTrace(book, loanId);
+    expect(urls[0]).toBe(`/api/trace?${expected}`);
+    expect(urls[0]).not.toContain("bookId");
+    expect(chain.simulated).toBeUndefined();
+    expect(chain.loans.map((item) => item.id)).toEqual(["loan-00009"]);
+    expect(chain.reader?.card_no).toBe("20240001");
+    expect(chain.device?.name).toBe("East kiosk");
+  });
+
+  it("turns a server 'not found' into TraceNotFound for the empty state", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => json(404, { code: "TRACE_NOT_FOUND", message: "Book not found" })));
+    await expect(fetchTrace("没有这本书")).rejects.toBeInstanceOf(TraceNotFound);
   });
 });

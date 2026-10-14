@@ -153,6 +153,8 @@ function Chain({ chain, busy, onLoan }: { chain: TraceChain; busy: boolean; onLo
   const { branchName } = useAdmin();
   const { book, loan, reader, device } = chain;
   const clipAlert = chain.alerts.find((alert) => alert.related_clip_id);
+  const clips = chain.clips ?? [];
+  const maintenance = chain.maintenance ?? [];
 
   return (
     <section className={busy ? "admin-trace is-refreshing" : "admin-trace"} aria-label={t("admin.trace.chainLabel", { title: book.title })} aria-busy={busy || undefined}>
@@ -206,8 +208,21 @@ function Chain({ chain, busy, onLoan }: { chain: TraceChain; busy: boolean; onLo
               </ol>
             </Step>
 
-            <Step index={5} label={t("admin.trace.step.clip")} code={clipAlert?.related_clip_id ?? undefined} title={clipAlert ? t("admin.trace.clipFrom", { alert: clipAlert.id }) : t("admin.trace.noClip")} tone={clipAlert ? "default" : "muted"}>
-              {clipAlert ? <ClipPlayer alert={clipAlert} device={device ?? undefined} /> : <p className="admin-trace-text admin-muted">{t("admin.trace.noClipBody")}</p>}
+            <Step index={5} label={t("admin.trace.step.clip")} code={clipAlert?.related_clip_id ?? clips[0]?.id} title={clipAlert ? t("admin.trace.clipFrom", { alert: clipAlert.id }) : clips.length ? t("admin.trace.clipCount", { count: clips.length }) : t("admin.trace.noClip")} tone={clipAlert || clips.length ? "default" : "muted"}>
+              {clipAlert ? <ClipPlayer alert={clipAlert} device={device ?? undefined} /> : null}
+              {clips.length ? (
+                <ul className="admin-trace-alerts">
+                  {clips.map((clip) => (
+                    <li key={clip.id}>
+                      <span>
+                        <b>{clip.device_name ?? clip.device_id ?? "—"}</b>
+                        <small className="mono">{clip.id} · {stamp(clip.start_ts)} – {stamp(clip.end_ts).slice(11)}{clip.file_path ? ` · ${clip.file_path}` : ""}</small>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+              {!clipAlert && !clips.length ? <p className="admin-trace-text admin-muted">{t("admin.trace.noClipBody")}</p> : null}
             </Step>
 
             <Step index={6} label={t("admin.trace.step.alerts")} code={String(chain.alerts.length)} title={chain.alerts.length ? t("admin.trace.alertCount", { count: chain.alerts.length }) : t("admin.trace.noAlerts")} tone={chain.alerts.some((alert) => alert.status !== "resolved") ? "alert" : chain.alerts.length ? "default" : "muted"}>
@@ -226,6 +241,25 @@ function Chain({ chain, busy, onLoan }: { chain: TraceChain; busy: boolean; onLo
               ) : <p className="admin-trace-text admin-muted">{t("admin.trace.noAlertsBody")}</p>}
               {chain.alerts.length ? <Link className="admin-trace-link" to="/admin/alerts">{t("admin.alerts.viewAll")} →</Link> : null}
             </Step>
+
+            {chain.maintenance ? (
+              <Step index={7} label={t("admin.trace.step.maintenance")} code={String(maintenance.length)} title={maintenance.length ? t("admin.trace.maintenanceCount", { count: maintenance.length }) : t("admin.trace.noMaintenance")} tone={maintenance.length ? "default" : "muted"}>
+                {maintenance.length ? (
+                  <ul className="admin-trace-alerts">
+                    {maintenance.map((item) => (
+                      <li key={item.id}>
+                        <StatusBadge tone={item.finished_at ? "ok" : "warn"} label={t(item.finished_at ? "admin.trace.maintenanceDone" : "admin.trace.maintenanceOpen")} />
+                        <span>
+                          <b>{item.description}</b>
+                          <small className="mono">{item.id} · {stamp(item.started_at)} · {item.device_name ?? item.device_id ?? "—"}{item.related_alert_id ? ` · ${item.related_alert_id}` : ""}</small>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : <p className="admin-trace-text admin-muted">{t("admin.trace.noMaintenanceBody")}</p>}
+                {maintenance.length ? <Link className="admin-trace-link" to="/admin/maintenance">{t("admin.trace.openMaintenance")} →</Link> : null}
+              </Step>
+            ) : null}
           </>
         ) : (
           <Step index={3} label={t("admin.trace.step.loan")} title={t("admin.trace.noLoans")} tone="muted">
