@@ -6,7 +6,7 @@ import { AlertIcon } from "../shared/icons";
 import { DEMO_MODE } from "../shared/demoMode";
 import { DemoReaderPicker } from "../shared/DemoReaderPicker";
 import { BookSpinesBand, PageTurn, prefersReducedMotion } from "../shared/motion";
-import { cardLogin, destinationFor, LoginError, loginErrorMessage, passwordLogin, type Role, type SessionUser } from "./loginApi";
+import { cardLogin, cardLoginErrorMessage, cardScan, destinationFor, LoginError, loginErrorMessage, passwordLogin, type Role, type SessionUser } from "./loginApi";
 import "./login.css";
 
 type Theme = "light" | "dark";
@@ -110,9 +110,15 @@ function isTextEntry(target: EventTarget | null) {
 function ReaderLogin({ focusOnMount, onSuccess }: { focusOnMount: boolean; onSuccess: (user: SessionUser) => void }) {
   const { t } = useTranslation();
   const inputRef = useRef<HTMLInputElement>(null);
+  const pinRef = useRef<HTMLInputElement>(null);
   const [cardNumber, setCardNumber] = useState("");
+  const [pin, setPin] = useState("");
   const [phase, setPhase] = useState<ReaderPhase>("idle");
-  const [error, setError] = useState<Message | null>(null);
+  // `field` says which input the message belongs to (the PIN field only exists once a card number is typed).
+  const [error, setError] = useState<(Message & { field: "card" | "pin" }) | null>(null);
+  // A demo-list scan fills in the card number too, but needs no PIN.
+  const [scanning, setScanning] = useState(false);
+  const showPin = cardNumber.trim() !== "" && !scanning;
   const busy = phase === "reading" || phase === "accepted";
 
   useEffect(() => {
@@ -137,23 +143,35 @@ function ReaderLogin({ focusOnMount, onSuccess }: { focusOnMount: boolean; onSuc
   }, []);
 
   useEffect(() => {
-    if (phase === "rejected") inputRef.current?.select();
+    if (phase !== "rejected") return;
+    if (error?.field === "pin") pinRef.current?.focus();
+    else inputRef.current?.select();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase]);
 
-  async function scan(number: string) {
+  /** `pin === null` is a card reader scan (demo list), which needs no PIN; a typed card number always does. */
+  async function signIn(number: string, pinValue: string | null) {
     if (busy) return;
     setError(null);
     if (!number.trim()) {
-      setError({ key: "login.error.cardRequired" });
+      setError({ key: "login.error.cardRequired", field: "card" });
       inputRef.current?.focus();
       return;
     }
+    if (pinValue !== null && !pinValue) {
+      setError({ key: "login.error.pinRequired", field: "pin" });
+      pinRef.current?.focus();
+      return;
+    }
+    setScanning(pinValue === null);
     setPhase("reading");
     // The card slides into the slot while the request runs; both must finish.
-    const [result] = await Promise.allSettled([cardLogin(number), wait(950)]);
+    const [result] = await Promise.allSettled([pinValue === null ? cardScan(number) : cardLogin(number, pinValue), wait(950)]);
     if (result.status === "rejected") {
+      setPin("");
+      setScanning(false);
+      setError({ ...cardLoginErrorMessage(result.reason), field: pinValue === null ? "card" : "pin" });
       setPhase("rejected");
-      setError(loginErrorMessage(result.reason));
       return;
     }
     setPhase("accepted");
@@ -162,7 +180,12 @@ function ReaderLogin({ focusOnMount, onSuccess }: { focusOnMount: boolean; onSuc
 
   const onSubmit = (event: FormEvent) => {
     event.preventDefault();
-    void scan(cardNumber);
+    // Enter in the card field moves on to the PIN; Enter in the PIN field signs in.
+    if (showPin && !pin && document.activeElement !== pinRef.current) {
+      pinRef.current?.focus();
+      return;
+    }
+    void signIn(cardNumber, pin);
   };
 
   return (
@@ -193,8 +216,8 @@ function ReaderLogin({ focusOnMount, onSuccess }: { focusOnMount: boolean; onSuc
           <TextField
             ref={inputRef}
             label={t("login.reader.cardLabel")}
-            hint={error ? undefined : t("login.reader.cardHint")}
-            error={error ? t(error.key, error.values) : undefined}
+            hint={error?.field === "card" ? undefined : t("login.reader.cardHint")}
+            error={error?.field === "card" ? t(error.key, error.values) : undefined}
             mono
             name="cardNumber"
             autoComplete="off"
@@ -206,6 +229,23 @@ function ReaderLogin({ focusOnMount, onSuccess }: { focusOnMount: boolean; onSuc
               if (phase === "rejected") setPhase("idle");
             }}
           />
+          {showPin ? (
+            <TextField
+              ref={pinRef}
+              label={t("login.reader.pinLabel")}
+              hint={DEMO_MODE && error?.field !== "pin" ? t("login.reader.pinHint") : undefined}
+              error={error?.field === "pin" ? t(error.key, error.values) : undefined}
+              type="password"
+              name="pin"
+              autoComplete="new-password"
+              value={pin}
+              disabled={busy}
+              onChange={(event) => {
+                setPin(event.target.value);
+                if (phase === "rejected") setPhase("idle");
+              }}
+            />
+          ) : null}
           <div className="login-actions">
             <Button type="submit" loading={phase === "reading"}>{t("login.reader.submit")}</Button>
             {/* Signs in as a chosen demo reader, so it is a demo-mode convenience only (renders nothing otherwise). */}
@@ -213,7 +253,7 @@ function ReaderLogin({ focusOnMount, onSuccess }: { focusOnMount: boolean; onSuc
               disabled={busy}
               onPick={(card) => {
                 setCardNumber(card);
-                void scan(card);
+                void signIn(card, null);
               }}
             />
           </div>

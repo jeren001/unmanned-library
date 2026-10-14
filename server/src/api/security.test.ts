@@ -99,7 +99,8 @@ const routes: RouteCase[] = [
   { method: "GET", path: "/api/health", access: "public", ok: 200 },
   { method: "GET", path: "/api/public/stats", access: "public", ok: 200 },
   { method: "POST", path: "/api/auth/login", access: "public", ok: 200, body: credentials.reader },
-  { method: "POST", path: "/api/auth/card-login", access: "public", ok: 200, body: { cardNumber: "20240001" } },
+  { method: "POST", path: "/api/auth/card-login", access: "public", ok: 200, body: { cardNumber: "20240001", pin: "reader123" } },
+  { method: "POST", path: "/api/auth/card-scan", access: "public", ok: 200, body: { cardNumber: "20240001" } },
   { method: "GET", path: "/api/auth/me", access: "public", ok: 200 },
   { method: "POST", path: "/api/auth/logout", access: "public", ok: 204, freshSession: true },
   { method: "GET", path: "/api/books", access: "operate", ok: 200 },
@@ -246,7 +247,7 @@ describe("login rate limiting", () => {
     const fresh = await startServer();
     try {
       const statuses: number[] = [];
-      for (let i = 0; i < 31; i += 1) statuses.push((await call(fresh.base, "POST", "/api/auth/card-login", { body: { cardNumber: `9900${String(i).padStart(4, "0")}` } })).status);
+      for (let i = 0; i < 31; i += 1) statuses.push((await call(fresh.base, "POST", "/api/auth/card-login", { body: { cardNumber: `9900${String(i).padStart(4, "0")}`, pin: "0000" } })).status);
       expect(statuses.slice(0, 30).every((status) => status === 401)).toBe(true);
       expect(statuses[30]).toBe(429);
       expect((await call(fresh.base, "POST", "/api/auth/login", { body: credentials.reader })).status).toBe(429);
@@ -324,8 +325,8 @@ describe("personal data masking", () => {
       const created = await call(harness.base, "POST", "/api/readers", { cookie: cookies.librarian, body: { username: "R-3001", display_name: "Created", email: "created@library.local", password_hash: "secret-hash", card_no: "20243001" } });
       const updated = await call(harness.base, "PATCH", "/api/readers/reader-001/status", { cookie: cookies.librarian, body: { status: "active" } });
       const exported = await call(harness.base, "GET", "/api/exports/preview?dataset=readers", { cookie: cookies.librarian });
-      await call(harness.base, "POST", "/api/auth/card-login", { body: { cardNumber: "20240001" } });
-      await call(harness.base, "POST", "/api/auth/card-login", { body: { cardNumber: "88887777" } });
+      await call(harness.base, "POST", "/api/auth/card-login", { body: { cardNumber: "20240001", pin: "reader123" } });
+      await call(harness.base, "POST", "/api/auth/card-login", { body: { cardNumber: "88887777", pin: "0000" } });
       await call(harness.base, "POST", "/api/auth/login", { body: { role: "reader", account: "reader.demo@library.local", password: "wrong" } });
 
       for (const response of [list, detail, created, updated, exported]) {

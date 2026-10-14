@@ -3,11 +3,12 @@ import { Trans, useTranslation } from "react-i18next";
 import { Link, useLocation, useNavigate } from "react-router";
 import { BookSpines, Button, LangSwitch, Logo } from "../shared/components";
 import { DemoReaderPicker } from "../shared/DemoReaderPicker";
+import { DEMO_MODE } from "../shared/demoMode";
 import { formatDate as formatLocalDate, formatNumber, formatTime } from "../shared/i18n";
 import { AlertIcon, CheckIcon, CloseIcon, InfoIcon, OfflineIcon } from "../shared/icons";
 import {
   borrowBook, cachedBooks, cachedRules, currentReader, getRules, getStats, listBooks, listLoans, loginCard,
-  loginPassword, logout, outboxCount, requestHelp, reserveBook, returnBook, renewLoan, syncOutbox
+  logout, outboxCount, requestHelp, reserveBook, returnBook, renewLoan, scanCard, syncOutbox
 } from "./kioskApi";
 import {
   initialKioskState, kioskReducer, type Book, type KioskResult, type KioskScreen, type KioskUser, type Loan
@@ -28,7 +29,8 @@ function formatDate(value?: string) {
 
 const ERROR_KEYS: Record<string, string> = {
   INVALID_CARD: "kiosk.error.invalidCard",
-  ACCOUNT_LOCKED: "kiosk.error.accountLocked",
+  INVALID_CREDENTIALS: "kiosk.error.wrongPin",
+  ACCOUNT_LOCKED: "kiosk.error.pinLocked",
   BOOK_UNAVAILABLE: "kiosk.error.bookUnavailable",
   ILLEGAL_BOOK_STATE: "kiosk.error.bookUnavailable",
   BOOK_NOT_FOUND: "kiosk.error.bookNotFound",
@@ -67,6 +69,7 @@ export function KioskPage() {
   const logoPress = useRef<number | undefined>(undefined);
   const logoLongPressed = useRef(false);
   const identifyRef = useRef<HTMLInputElement>(null);
+  const pinRef = useRef<HTMLInputElement>(null);
   const idleScanRef = useRef<HTMLInputElement>(null);
   const lastActivity = useRef(Date.now());
 
@@ -183,22 +186,29 @@ export function KioskPage() {
 
   const back = () => dispatch({ type: "BACK" });
 
-  async function identify(number = card) {
+  /** `scanned` is a card reader scan (demo mode), which needs no PIN; a typed card number always does. */
+  async function identify(number = card, scanned = false) {
     dispatch({ type: "CLEAR_ERROR" });
     if (!number.trim()) {
       dispatch({ type: "INPUT_ERROR", message: "kiosk.error.cardRequired" });
       identifyRef.current?.focus();
       return;
     }
+    if (!scanned && !pin) {
+      dispatch({ type: "INPUT_ERROR", message: "kiosk.error.pinRequired" });
+      pinRef.current?.focus();
+      return;
+    }
     setBusy(true);
     try {
-      const user = pin ? await loginPassword(number.trim(), pin) : await loginCard(number.trim());
+      const user = scanned ? await scanCard(number.trim()) : await loginCard(number.trim(), pin);
       dispatch({ type: "LOGIN", user });
       await refreshBooks();
       await refreshLoans();
       setCard("");
       setPin("");
     } catch (error) {
+      setPin("");
       dispatch({ type: "ERROR", message: errorMessage(error) });
     } finally {
       setBusy(false);
@@ -373,7 +383,11 @@ export function KioskPage() {
     if (logoPress.current) window.clearTimeout(logoPress.current);
   }
 
-  const idleScreen = <IdleScreen time={today} occupancy={state.occupancy} capacity={state.capacity} onStart={() => dispatch({ type: "SHOW_IDENTIFY" })} scanRef={idleScanRef} onScan={(value) => { setCard(value); dispatch({ type: "SHOW_IDENTIFY" }); }} />;
+  const idleScreen = <IdleScreen time={today} occupancy={state.occupancy} capacity={state.capacity} onStart={() => dispatch({ type: "SHOW_IDENTIFY" })} scanRef={idleScanRef} onScan={(value) => {
+    // In demo mode the idle scanner stands in for the card reader (no PIN); otherwise it prefills the identify screen.
+    if (DEMO_MODE) { dispatch({ type: "SHOW_IDENTIFY" }); void identify(value, true); }
+    else { setCard(value); dispatch({ type: "SHOW_IDENTIFY" }); }
+  }} />;
   const homeScreen = state.user ? <KioskHome user={state.user.name} loans={activeLoans} onNavigate={go} onSearch={searchCatalogue} onReserve={reserveFromSearch} /> : null;
 
   return (
@@ -414,7 +428,7 @@ export function KioskPage() {
       {state.screen === "idle" ? (
         idleScreen
       ) : state.screen === "identify" ? (
-        <IdentifyScreen card={card} pin={pin} setCard={setCard} setPin={setPin} onSubmit={() => void identify()} onDemoPick={(number) => { setCard(number); void identify(number); }} error={state.error || state.inputError} inputRef={identifyRef} loading={busy} />
+        <IdentifyScreen card={card} pin={pin} setCard={setCard} setPin={setPin} onSubmit={() => void identify()} onDemoPick={(number) => void identify(number, true)} error={state.error || state.inputError} inputRef={identifyRef} pinRef={pinRef} loading={busy} />
       ) : state.screen === "home" && state.user ? (
         homeScreen
       ) : state.screen === "borrow" && state.user ? (
@@ -490,14 +504,20 @@ function IdleScreen({ time, occupancy, capacity, onStart, scanRef, onScan }: { t
   </section>;
 }
 
-function IdentifyScreen({ card, pin, setCard, setPin, onSubmit, onDemoPick, error, inputRef, loading }: { card: string; pin: string; setCard: (value: string) => void; setPin: (value: string) => void; onSubmit: () => void; onDemoPick: (card: string) => void; error: string; inputRef: RefObject<HTMLInputElement | null>; loading: boolean }) {
+function IdentifyScreen({ card, pin, setCard, setPin, onSubmit, onDemoPick, error, inputRef, pinRef, loading }: { card: string; pin: string; setCard: (value: string) => void; setPin: (value: string) => void; onSubmit: () => void; onDemoPick: (card: string) => void; error: string; inputRef: RefObject<HTMLInputElement | null>; pinRef: RefObject<HTMLInputElement | null>; loading: boolean }) {
+  const { t } = useTranslation();
   const text = useKioskText();
   return <KioskShell title="identify" onBack={undefined}>
     <div className="kiosk-identify">
       <div className="kiosk-scan-mark">◎</div>
       <h2>刷卡或输入证号<small>Tap your card or enter card number</small></h2>
-      <input ref={inputRef} className="kiosk-scan-input" autoFocus value={card} onChange={(event) => setCard(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") onSubmit(); }} placeholder="20240001" aria-label="Reader card number" />
-      <label className="kiosk-pin-field"><span>PIN（可选） / Optional PIN</span><input inputMode="numeric" value={pin} onChange={(event) => setPin(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") onSubmit(); }} placeholder="••••" /></label>
+      <input ref={inputRef} className="kiosk-scan-input" autoFocus value={card} onChange={(event) => setCard(event.target.value)} onKeyDown={(event) => {
+        // Enter moves on to the PIN; a card number alone never signs in.
+        if (event.key !== "Enter") return;
+        if (card.trim() && !pin) pinRef.current?.focus();
+        else onSubmit();
+      }} placeholder="20240001" aria-label="Reader card number" />
+      {card.trim() ? <label className="kiosk-pin-field"><span>{t("kiosk.identify.pinLabel")}</span><input ref={pinRef} type="password" autoComplete="new-password" name="pin" value={pin} onChange={(event) => setPin(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") onSubmit(); }} placeholder="••••" />{DEMO_MODE ? <small className="kiosk-pin-hint">{t("login.reader.pinHint")}</small> : null}</label> : null}
       {error ? <p className="kiosk-error" role="alert"><AlertIcon />{text(error)}</p> : null}
       <Button loading={loading} onClick={onSubmit}>{bilingual("继续", "Continue")}</Button>
       <DemoReaderPicker className="kiosk-demo-readers" disabled={loading} onPick={onDemoPick} />

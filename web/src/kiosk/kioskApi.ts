@@ -112,8 +112,19 @@ export async function outboxCount() {
   return (await allOutbox()).length;
 }
 
-export async function loginCard(cardNumber: string) {
+/** A typed card number needs the reader's PIN. */
+export async function loginCard(cardNumber: string, pin: string) {
   const response = await request<{ user: KioskUser }>("/api/auth/card-login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ cardNumber, pin })
+  });
+  return response.user;
+}
+
+/** Simulated card reader (demo mode only): holding the card is the proof, so no PIN. */
+export async function scanCard(cardNumber: string) {
+  const response = await request<{ user: KioskUser }>("/api/auth/card-scan", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ cardNumber })

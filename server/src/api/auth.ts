@@ -28,6 +28,8 @@ type Session = {
 type AuditEntry = {
   at: string;
   event: "login" | "card-login" | "logout";
+  /** Card sign-in only: typed card number plus PIN, or a card reader scan. */
+  method?: "pin" | "scan";
   account: string;
   role?: Role;
   success: boolean;
@@ -51,8 +53,18 @@ const loginSchema = z.object({
 });
 
 const cardLoginSchema = z.object({
+  cardNumber: z.string().trim().min(1),
+  pin: z.string().min(1)
+});
+
+const cardScanSchema = z.object({
   cardNumber: z.string().trim().min(1)
 });
+
+/** The simulated card reader (POST /card-scan) exists only in demo mode: DEMO_MODE=true, on by default outside production. */
+export function isServerDemoMode(env: NodeJS.ProcessEnv = process.env) {
+  return env.DEMO_MODE ? env.DEMO_MODE === "true" : env.NODE_ENV !== "production";
+}
 
 const users = new Map<string, User>();
 const sessions = new Map<string, Session>();
@@ -138,7 +150,7 @@ function audit(repo: LibraryRepository | undefined, entry: Omit<AuditEntry, "at"
       action: entry.event,
       entity: "auth",
       entity_id: row.account,
-      detail_json: JSON.stringify({ role: entry.role, success: entry.success, reason: entry.reason }),
+      detail_json: JSON.stringify({ role: entry.role, success: entry.success, reason: entry.reason, method: entry.method }),
       ip: entry.ip,
       ts: row.at
     });
@@ -293,8 +305,60 @@ authRouter.post("/login", rateLimit, async (req, res) => {
   res.json({ user: publicUser(user) });
 });
 
-authRouter.post("/card-login", rateLimit, (req, res) => {
+// A typed card number is not proof of holding the card, so it needs the reader's PIN (their account password).
+authRouter.post("/card-login", rateLimit, async (req, res) => {
   const parsed = cardLoginSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "INVALID_INPUT" });
+    return;
+  }
+
+  const { cardNumber, pin } = parsed.data;
+  const ip = req.ip;
+  const user = findUserByCard(repo, cardNumber);
+  const matchedCard = user?.card_no && safeCardCompare(cardNumber, user.card_no);
+  // Unknown card and wrong PIN get the same answer, so the endpoint does not reveal which card numbers exist.
+  const invalid = () => res.status(401).json({ code: "INVALID_CREDENTIALS", error: "INVALID_CREDENTIALS", message: "Card number or PIN is incorrect." });
+  if (!user || !matchedCard) {
+    audit(repo, { event: "card-login", method: "pin", account: String(maskTail(cardNumber)), role: "reader", success: false, reason: "unknown-card", ip });
+    invalid();
+    return;
+  }
+
+  if (user.lockedUntil && Date.parse(user.lockedUntil) > Date.now()) {
+    audit(repo, { event: "card-login", method: "pin", account: user.username, role: "reader", success: false, reason: "locked", ip });
+    res.status(423).json({ code: "ACCOUNT_LOCKED", error: "ACCOUNT_LOCKED", message: "Account is locked after 5 failed attempts." });
+    return;
+  }
+
+  if (!(await safePasswordCompare(pin, user.passwordHash))) {
+    const nextAttempts = (failedAttempts.get(user.id) ?? 0) + 1;
+    failedAttempts.set(user.id, nextAttempts);
+    const lockedUntil = nextAttempts >= 5 ? new Date(Date.now() + LOCK_MS).toISOString() : null;
+    if (lockedUntil && repo) repo.update("users", user.id, { locked_until: lockedUntil });
+    audit(repo, { event: "card-login", method: "pin", account: user.username, role: "reader", success: false, reason: lockedUntil ? "locked" : "wrong-pin", ip });
+    if (lockedUntil) res.status(423).json({ code: "ACCOUNT_LOCKED", error: "ACCOUNT_LOCKED", message: "Account is locked after 5 failed attempts." });
+    else invalid();
+    return;
+  }
+
+  failedAttempts.set(user.id, 0);
+  if (repo) repo.update("users", user.id, { locked_until: null });
+  const sessionId = createSession(user);
+  setSessionCookie(res, sessionId);
+  audit(repo, { event: "card-login", method: "pin", account: user.username, role: "reader", success: true, ip });
+  res.json({ user: publicUser(user) });
+});
+
+// Simulates the physical card reader: holding the card is the proof, so no PIN. Demo mode only.
+authRouter.post("/card-scan", (req, res, next) => {
+  if (!isServerDemoMode()) {
+    res.status(404).json({ error: "NOT_FOUND" });
+    return;
+  }
+  next();
+}, rateLimit, (req, res) => {
+  const parsed = cardScanSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "INVALID_INPUT" });
     return;
@@ -303,14 +367,14 @@ authRouter.post("/card-login", rateLimit, (req, res) => {
   const user = findUserByCard(repo, parsed.data.cardNumber);
   const matchedCard = user?.card_no && safeCardCompare(parsed.data.cardNumber, user.card_no);
   if (!user || !matchedCard) {
-    audit(repo, { event: "card-login", account: String(maskTail(parsed.data.cardNumber)), role: "reader", success: false, reason: "unknown-card", ip: req.ip });
+    audit(repo, { event: "card-login", method: "scan", account: String(maskTail(parsed.data.cardNumber)), role: "reader", success: false, reason: "unknown-card", ip: req.ip });
     res.status(401).json({ code: "INVALID_CARD", error: "INVALID_CARD", message: "Reader card was not recognized." });
     return;
   }
 
   const sessionId = createSession(user);
   setSessionCookie(res, sessionId);
-  audit(repo, { event: "card-login", account: user.username, role: "reader", success: true, ip: req.ip });
+  audit(repo, { event: "card-login", method: "scan", account: user.username, role: "reader", success: true, ip: req.ip });
   res.json({ user: publicUser(user) });
 });
 

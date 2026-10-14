@@ -43,8 +43,14 @@ export function passwordLogin(role: Role, account: string, password: string, rem
   return postLogin("/api/auth/login", { role, account: account.trim(), password, remember });
 }
 
-export function cardLogin(cardNumber: string) {
-  return postLogin("/api/auth/card-login", { cardNumber: cardNumber.trim() });
+/** A typed card number needs the reader's PIN. */
+export function cardLogin(cardNumber: string, pin: string) {
+  return postLogin("/api/auth/card-login", { cardNumber: cardNumber.trim(), pin });
+}
+
+/** Simulated card reader (demo mode only): holding the card is the proof, so no PIN. */
+export function cardScan(cardNumber: string) {
+  return postLogin("/api/auth/card-scan", { cardNumber: cardNumber.trim() });
 }
 
 /** i18n key (+ interpolation values) for a failed login. */
@@ -68,4 +74,12 @@ export function loginErrorMessage(error: unknown): { key: string; values?: Recor
     default:
       return { key: "login.error.unknown" };
   }
+}
+
+/** Card sign-in errors: a wrong card or PIN and the PIN lockout get their own wording. */
+export function cardLoginErrorMessage(error: unknown): { key: string; values?: Record<string, number> } {
+  const code = error instanceof LoginError ? error.code : "UNKNOWN";
+  if (code === "INVALID_CREDENTIALS") return { key: "login.error.wrongPin" };
+  if (code === "ACCOUNT_LOCKED") return { key: "login.error.pinLocked" };
+  return loginErrorMessage(error);
 }
