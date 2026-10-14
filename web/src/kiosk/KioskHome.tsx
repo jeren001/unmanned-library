@@ -37,7 +37,7 @@ export function KioskHome({ user, loans, onNavigate, onSearch, onReserve }: {
   /** Opens the reserve flow for a book that is on loan. */
   onReserve: (book: Book) => void;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const name = t(`login.userName.${user}`, { defaultValue: user });
 
   const sorted = useMemo(() => [...loans].sort((a, b) => new Date(a.due_at).getTime() - new Date(b.due_at).getTime()), [loans]);
@@ -66,12 +66,12 @@ export function KioskHome({ user, loans, onNavigate, onSearch, onReserve }: {
 
         <aside className="kiosk-my-loans" aria-labelledby="kiosk-my-loans-title">
           <div className="kiosk-my-loans-head">
-            <h2 id="kiosk-my-loans-title">{t("kiosk.home.loans.title")} · <CountUp value={loans.length} duration={700} /></h2>
+            <h2 id="kiosk-my-loans-title">{t("kiosk.home.loans.title")} · <CountUp value={loans.length} duration={700} locale={i18n.language} /></h2>
             <button type="button" onClick={() => onNavigate("loans")}>{t("kiosk.home.loans.all")}</button>
           </div>
           <div className="kiosk-my-loans-stats">
-            <span className={dueSoon ? "is-soon" : ""}><CountUp value={dueSoon} duration={700} /> {t("kiosk.home.loans.dueSoon")}</span>
-            <span className={overdue ? "is-late" : ""}><CountUp value={overdue} duration={700} /> {t("kiosk.home.loans.overdue")}</span>
+            <span className={dueSoon ? "is-soon" : ""}><CountUp value={dueSoon} duration={700} locale={i18n.language} /> {t("kiosk.home.loans.dueSoon")}</span>
+            <span className={overdue ? "is-late" : ""}><CountUp value={overdue} duration={700} locale={i18n.language} /> {t("kiosk.home.loans.overdue")}</span>
           </div>
           {sorted.length ? (
             <StaggerList as="ul" className="kiosk-my-loans-list" delay={350} step={100}>
@@ -79,7 +79,7 @@ export function KioskHome({ user, loans, onNavigate, onSearch, onReserve }: {
                 const due = dues[index];
                 return (
                   <li key={loan.id}>
-                    <span>《{loan.book?.title ?? loan.book_id}》</span>
+                    <span>{t("kiosk.home.bookTitle", { title: loan.book?.title ?? loan.book_id })}</span>
                     <em className={`kiosk-due is-${due.tone}`}>
                       {due.tone === "late" ? t("kiosk.home.due.late", { count: due.days }) : due.days === 0 ? t("kiosk.home.due.today") : t("kiosk.home.due.in", { count: due.days })}
                     </em>
@@ -152,7 +152,7 @@ function CatalogSearch({ onSearch, onReserve }: { onSearch: (query: string) => P
                   <li key={book.id}>
                     <i style={{ background: book.cover_color }} aria-hidden="true" />
                     <div>
-                      <strong>《{book.title}》</strong>
+                      <strong>{t("kiosk.home.bookTitle", { title: book.title })}</strong>
                       <span>{book.author} · <span className="mono">{book.shelf_location}</span></span>
                     </div>
                     <em className={`kiosk-due ${onShelf ? "is-ok" : "is-soon"}`}>{t(onShelf ? "kiosk.home.search.onShelf" : "kiosk.home.search.onLoan")}</em>

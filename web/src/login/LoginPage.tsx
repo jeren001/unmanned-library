@@ -2,9 +2,8 @@ import { type FormEvent, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
 import { Button, LangSwitch, SegmentedControl, Tabs, TextField } from "../shared/components";
-import { AlertIcon, CheckIcon } from "../shared/icons";
+import { AlertIcon } from "../shared/icons";
 import { BookSpinesBand, PageTurn, prefersReducedMotion } from "../shared/motion";
-import { BookOpening } from "./BookOpening";
 import { cardLogin, destinationFor, LoginError, loginErrorMessage, passwordLogin, type Role, type SessionUser } from "./loginApi";
 import "./login.css";
 
@@ -40,7 +39,6 @@ export function LoginPage() {
   const navigate = useNavigate();
   const [theme, setTheme] = useState<Theme>(initialTheme);
   const [role, setRole] = useState<Role>("reader");
-  const [signedIn, setSignedIn] = useState<SessionUser | null>(null);
   const [switchedTab, setSwitchedTab] = useState(false);
 
   useEffect(() => {
@@ -55,9 +53,9 @@ export function LoginPage() {
     document.documentElement.lang = i18n.language;
   }, [i18n.language]);
 
+  // Readers land on kiosk Home already identified (the kiosk reads `reader`); staff go straight to the console.
   const onSuccess = (user: SessionUser) => {
-    if (user.role === "reader") setSignedIn(user);
-    else navigate(destinationFor(user.role), { replace: true, state: { fromLogin: true } });
+    navigate(destinationFor(user.role), { replace: true, state: user.role === "reader" ? { reader: user } : { fromLogin: true } });
   };
 
   return (
@@ -100,20 +98,8 @@ export function LoginPage() {
           </PageTurn>
         </section>
       </div>
-
-      {signedIn ? (
-        <BookOpening
-          name={localizedName(t, signedIn.name)}
-          onDone={() => navigate(destinationFor(signedIn.role), { replace: true })}
-        />
-      ) : null}
     </main>
   );
-}
-
-/** The API only has one display name; known accounts get a translated form, anything else is shown as stored. */
-function localizedName(t: ReturnType<typeof useTranslation>["t"], name: string) {
-  return t(`login.userName.${name}`, { defaultValue: name });
 }
 
 function isTextEntry(target: EventTarget | null) {
@@ -125,7 +111,6 @@ function ReaderLogin({ focusOnMount, onSuccess }: { focusOnMount: boolean; onSuc
   const inputRef = useRef<HTMLInputElement>(null);
   const [cardNumber, setCardNumber] = useState("");
   const [phase, setPhase] = useState<ReaderPhase>("idle");
-  const [user, setUser] = useState<SessionUser | null>(null);
   const [error, setError] = useState<Message | null>(null);
   const busy = phase === "reading" || phase === "accepted";
 
@@ -170,9 +155,7 @@ function ReaderLogin({ focusOnMount, onSuccess }: { focusOnMount: boolean; onSuc
       setError(loginErrorMessage(result.reason));
       return;
     }
-    setUser(result.value);
     setPhase("accepted");
-    await wait(1500);
     onSuccess(result.value);
   }
 
@@ -237,9 +220,6 @@ function ReaderLogin({ focusOnMount, onSuccess }: { focusOnMount: boolean; onSuc
             </Button>
           </div>
         </form>
-        <p className={`login-welcome ${phase === "accepted" ? "is-on" : ""}`} role="status">
-          {phase === "accepted" && user ? <><CheckIcon />{t("login.reader.welcome", { name: localizedName(t, user.name) })}</> : null}
-        </p>
       </div>
     </div>
   );

@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
 
-/* Login messages follow the selected language, staff go straight to the console, readers get a short book opening. */
+/* Login messages follow the selected language and staff go straight to the console (readers: reader-session.spec.ts). */
 
 const alerts = (page: Page) => page.locator(".login-panel [role=alert]");
 
@@ -41,25 +41,3 @@ for (const role of ["librarian", "admin"] as const) {
     await expect(page.locator(".admin-sidebar")).toBeVisible();
   });
 }
-
-test("reader gets a ~1.2 s book opening with an Enter now button visible from the start", async ({ page }) => {
-  await page.goto("/login");
-  await page.getByRole("button", { name: "EN", exact: true }).click();
-  await page.getByRole("button", { name: "Simulate scan" }).click();
-  await expect(page.locator(".login-open")).toBeVisible();
-  const opened = Date.now();
-  const enter = page.getByRole("button", { name: "Enter now" });
-  await expect(enter).toBeVisible();
-  await expect(enter).toBeInViewport();
-  await expect(page.locator(".login-open-hello")).toHaveText("Hello, Lin Zhiqiu");
-  await page.waitForURL(/\/kiosk/, { timeout: 5_000 });
-  expect(Date.now() - opened).toBeLessThan(2_000);
-});
-
-test("Enter now skips the reader transition", async ({ page }) => {
-  await page.goto("/login");
-  await page.getByRole("button", { name: /模拟刷卡/ }).click();
-  await expect(page.locator(".login-open-hello")).toHaveText("你好，林知秋");
-  await page.getByRole("button", { name: "立即进入" }).click();
-  await page.waitForURL(/\/kiosk/);
-});

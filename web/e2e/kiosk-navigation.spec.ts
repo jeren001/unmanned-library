@@ -15,7 +15,7 @@ test.use({ contextOptions: { reducedMotion: "reduce" } });
 const screen = (page: Page) => page.locator("main.kiosk-page > section");
 const back = (page: Page) => page.locator(".kiosk-nav-back");
 const home = (page: Page) => page.locator(".kiosk-nav-home");
-const helpButton = (page: Page) => page.getByRole("button", { name: "Help", exact: true });
+const helpButton = (page: Page) => page.getByRole("button", { name: /^(帮助|Help)$/ });
 type Entry = "borrow" | "return" | "renew" | "reserve" | "loans" | "help";
 /** How each screen is opened from home: service tiles, the "My loans" panel, or the "?" button. */
 const open = (page: Page, entry: Entry) =>

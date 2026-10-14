@@ -125,7 +125,6 @@ export const resources = {
       "login.reader.cardHint": "扫码枪或键盘输入后按回车",
       "login.reader.submit": "进入",
       "login.reader.simulate": "模拟刷卡",
-      "login.reader.welcome": "欢迎，{{name}}",
       "login.librarian.title": "馆员登录",
       "login.librarian.body": "使用工号和密码登录管理端。",
       "login.admin.title": "管理员登录",
@@ -151,17 +150,6 @@ export const resources = {
       "login.error.cardRequired": "请刷卡或输入读者证号。",
       "login.error.accountRequired": "请输入工号或用户名。",
       "login.error.passwordRequired": "请输入密码。",
-      "login.cover.subtitle": "UNMANNED LIBRARY",
-      "login.open.hello": "你好，{{name}}",
-      "login.open.kiosk": "自助借还机已就绪",
-      "login.open.admin": "正在打开管理端",
-      "login.open.tile.borrow": "借书",
-      "login.open.tile.return": "还书",
-      "login.open.tile.renew": "续借",
-      "login.open.tile.catalogue": "馆藏",
-      "login.open.tile.devices": "设备",
-      "login.open.tile.alerts": "告警",
-      "login.open.enter": "立即进入",
       "login.userName.林知秋": "林知秋",
       "login.userName.馆员值班台": "馆员值班台",
       "login.userName.系统管理员": "系统管理员",
@@ -177,6 +165,7 @@ export const resources = {
       "admin.allBranches": "全部馆舍",
       "admin.search": "搜索页面或图书",
       "admin.logout": "退出登录",
+      "nav.logout": "退出",
       "admin.retry": "重试",
       "admin.all": "全部",
       "admin.filter": "按状态筛选",
@@ -674,6 +663,33 @@ export const resources = {
       "kiosk.nav.label": "页面导航",
       "kiosk.nav.back": "返回",
       "kiosk.nav.home": "首页",
+      "kiosk.branch.branch-east": "校园东馆",
+      "kiosk.header.hours": "今日开放 {{from}}–{{to}}",
+      "kiosk.header.loginPage": "登录页",
+      "kiosk.header.help": "帮助",
+      "kiosk.idle.scanner": "读卡器输入",
+      "kiosk.idle.eyebrow": "无人值守图书馆 · 自助服务",
+      "kiosk.idle.presence": "现在馆内 <b>{{people}}</b> 人 / {{capacity}} 人容量",
+      "kiosk.idle.calm": "馆内安静开放",
+      "kiosk.idle.full": "当前已满",
+      "kiosk.idle.start": "请刷读者证或扫码入馆",
+      "kiosk.idle.artPlace": "校园东馆",
+      "kiosk.idle.artRoom": "阅览室",
+      "kiosk.screen.identify": "请先验证身份",
+      "kiosk.screen.borrow": "借阅图书",
+      "kiosk.screen.return": "归还图书",
+      "kiosk.screen.renew": "续借图书",
+      "kiosk.screen.reserve": "预约图书",
+      "kiosk.screen.loans": "我的借阅",
+      "kiosk.screen.help": "需要帮助？",
+      "kiosk.help.step.card": "刷读者证",
+      "kiosk.help.step.tray": "把书放在感应区",
+      "kiosk.help.step.receipt": "确认并取走小票",
+      "kiosk.help.fault": "设备故障或需要人工协助？",
+      "kiosk.help.call": "呼叫远程支持",
+      "kiosk.help.sent": "已呼叫远程支持，馆员会尽快回应，请留在自助机旁",
+      "kiosk.help.queued": "请求已记录，网络恢复后会通知馆员",
+      "kiosk.home.bookTitle": "《{{title}}》",
       "notFound.title": "找不到这一页",
       "notFound.body": "这个地址没有对应的页面，可能已被移动或输入有误。",
       "notFound.back": "返回登录页",
@@ -806,7 +822,6 @@ export const resources = {
       "login.reader.cardHint": "Scan, or type the number and press Enter",
       "login.reader.submit": "Enter",
       "login.reader.simulate": "Simulate scan",
-      "login.reader.welcome": "Welcome, {{name}}",
       "login.librarian.title": "Librarian sign-in",
       "login.librarian.body": "Sign in to the console with your staff ID and password.",
       "login.admin.title": "Administrator sign-in",
@@ -832,17 +847,6 @@ export const resources = {
       "login.error.cardRequired": "Scan or enter a reader card number.",
       "login.error.accountRequired": "Enter your staff ID or username.",
       "login.error.passwordRequired": "Enter your password.",
-      "login.cover.subtitle": "无人值守图书馆",
-      "login.open.hello": "Hello, {{name}}",
-      "login.open.kiosk": "The self-service kiosk is ready",
-      "login.open.admin": "Opening the console",
-      "login.open.tile.borrow": "Borrow",
-      "login.open.tile.return": "Return",
-      "login.open.tile.renew": "Renew",
-      "login.open.tile.catalogue": "Catalogue",
-      "login.open.tile.devices": "Devices",
-      "login.open.tile.alerts": "Alerts",
-      "login.open.enter": "Enter now",
       "login.userName.林知秋": "Lin Zhiqiu",
       "login.userName.馆员值班台": "Duty librarian",
       "login.userName.系统管理员": "System administrator",
@@ -858,6 +862,7 @@ export const resources = {
       "admin.allBranches": "All branches",
       "admin.search": "Search pages or books",
       "admin.logout": "Log out",
+      "nav.logout": "Log out",
       "admin.retry": "Retry",
       "admin.all": "All",
       "admin.filter": "Filter by status",
@@ -1355,6 +1360,33 @@ export const resources = {
       "kiosk.nav.label": "Page navigation",
       "kiosk.nav.back": "Back",
       "kiosk.nav.home": "Home",
+      "kiosk.branch.branch-east": "East Campus Library",
+      "kiosk.header.hours": "Open today {{from}}–{{to}}",
+      "kiosk.header.loginPage": "Login page",
+      "kiosk.header.help": "Help",
+      "kiosk.idle.scanner": "Card scanner input",
+      "kiosk.idle.eyebrow": "UNMANNED LIBRARY · SELF-SERVICE",
+      "kiosk.idle.presence": "<b>{{people}}</b> people inside / capacity {{capacity}}",
+      "kiosk.idle.calm": "Open and calm",
+      "kiosk.idle.full": "Currently full",
+      "kiosk.idle.start": "Tap your card or scan QR to enter",
+      "kiosk.idle.artPlace": "EAST CAMPUS",
+      "kiosk.idle.artRoom": "READING ROOM",
+      "kiosk.screen.identify": "Identify yourself",
+      "kiosk.screen.borrow": "Borrow books",
+      "kiosk.screen.return": "Return books",
+      "kiosk.screen.renew": "Renew books",
+      "kiosk.screen.reserve": "Reserve a book",
+      "kiosk.screen.loans": "My loans",
+      "kiosk.screen.help": "Need help?",
+      "kiosk.help.step.card": "Tap your card",
+      "kiosk.help.step.tray": "Place books on the tray",
+      "kiosk.help.step.receipt": "Confirm and take the receipt",
+      "kiosk.help.fault": "Device fault or need a person?",
+      "kiosk.help.call": "Call remote support",
+      "kiosk.help.sent": "Support called. A librarian will respond shortly; please stay at the kiosk.",
+      "kiosk.help.queued": "Request noted. It will reach a librarian when the network is back.",
+      "kiosk.home.bookTitle": "“{{title}}”",
       "notFound.title": "Page not found",
       "notFound.body": "There is no page at this address. It may have moved, or the link is mistyped.",
       "notFound.back": "Back to login",
@@ -1366,13 +1398,53 @@ export const resources = {
   }
 } as const;
 
+export type Language = keyof typeof resources;
+
+/** The chosen language is shared by every page (login, kiosk, admin, wallboard) and survives reloads. */
+export const LANGUAGE_KEY = "ul-lang";
+
+function storedLanguage(): Language {
+  try {
+    const stored = localStorage.getItem(LANGUAGE_KEY);
+    return stored === "en" || stored === "zh-CN" ? stored : "zh-CN";
+  } catch {
+    return "zh-CN";
+  }
+}
+
 void i18n.use(initReactI18next).init({
   resources,
-  lng: "zh-CN",
+  lng: storedLanguage(),
   fallbackLng: "en",
   interpolation: {
     escapeValue: false
   }
 });
+
+function applyLanguage(language: string) {
+  try {
+    localStorage.setItem(LANGUAGE_KEY, language);
+  } catch {
+    // Remembering the language is a convenience; the switch still works without storage.
+  }
+  if (typeof document !== "undefined") document.documentElement.lang = language;
+}
+
+applyLanguage(i18n.language);
+i18n.on("languageChanged", applyLanguage);
+
+/** Dates in the selected language: "11月13日" in zh-CN, "Nov 13" in en. */
+export function formatDate(value: string | number | Date, options: Intl.DateTimeFormatOptions = { month: "short", day: "numeric" }) {
+  return new Intl.DateTimeFormat(i18n.language, options).format(new Date(value));
+}
+
+/** Clock time in the selected language, always 24-hour so the kiosk clock keeps its width. */
+export function formatTime(value: string | number | Date) {
+  return new Intl.DateTimeFormat(i18n.language, { hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date(value));
+}
+
+export function formatNumber(value: number, options?: Intl.NumberFormatOptions) {
+  return new Intl.NumberFormat(i18n.language, options).format(value);
+}
 
 export default i18n;

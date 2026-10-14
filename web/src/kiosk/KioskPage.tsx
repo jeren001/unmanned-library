@@ -1,14 +1,15 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type Dispatch, type ReactNode, type RefObject } from "react";
-import { useTranslation } from "react-i18next";
-import { Link, useNavigate } from "react-router";
+import { Trans, useTranslation } from "react-i18next";
+import { Link, useLocation, useNavigate } from "react-router";
 import { BookSpines, Button, LangSwitch, Logo } from "../shared/components";
+import { formatDate as formatLocalDate, formatNumber, formatTime } from "../shared/i18n";
 import { AlertIcon, CheckIcon, CloseIcon, InfoIcon, OfflineIcon } from "../shared/icons";
 import {
-  borrowBook, cachedBooks, cachedRules, getRules, getStats, listBooks, listLoans, loginCard,
+  borrowBook, cachedBooks, cachedRules, currentReader, getRules, getStats, listBooks, listLoans, loginCard,
   loginPassword, logout, outboxCount, requestHelp, reserveBook, returnBook, renewLoan, syncOutbox
 } from "./kioskApi";
 import {
-  initialKioskState, kioskReducer, type Book, type KioskResult, type KioskScreen, type Loan
+  initialKioskState, kioskReducer, type Book, type KioskResult, type KioskScreen, type KioskUser, type Loan
 } from "./kioskState";
 import { BorrowFlow, BorrowReceipt } from "./BorrowFlow";
 import { LoansFlow, RenewFlow, ReserveFlow, ReturnFlow, ReturnResult } from "./LoanFlows";
@@ -16,26 +17,12 @@ import { KioskHome } from "./KioskHome";
 import { overdueDays } from "./kioskUi";
 import "./kiosk.css";
 
-const screenCopy: Record<KioskScreen, { zh: string; en: string }> = {
-  idle: { zh: "欢迎进入", en: "Welcome" },
-  identify: { zh: "请先验证身份", en: "Identify yourself" },
-  home: { zh: "你好，", en: "Hello, " },
-  borrow: { zh: "借阅图书", en: "Borrow books" },
-  return: { zh: "归还图书", en: "Return books" },
-  renew: { zh: "续借图书", en: "Renew books" },
-  reserve: { zh: "预约图书", en: "Reserve a book" },
-  loans: { zh: "我的借阅", en: "My loans" },
-  help: { zh: "需要帮助？", en: "Need help?" },
-  result: { zh: "已完成", en: "Completed" }
-};
-
 function bilingual(zh: string, en: string) {
   return <><span>{zh}</span><small>{en}</small></>;
 }
 
 function formatDate(value?: string) {
-  if (!value) return "--";
-  return new Intl.DateTimeFormat("zh-CN", { month: "short", day: "numeric" }).format(new Date(value));
+  return value ? formatLocalDate(value) : "--";
 }
 
 function errorMessage(error: unknown) {
@@ -50,7 +37,11 @@ function errorMessage(error: unknown) {
 }
 
 export function KioskPage() {
-  const [state, dispatch] = useReducer(kioskReducer, initialKioskState);
+  const { t } = useTranslation();
+  const location = useLocation();
+  // A reader who just signed in on /login arrives identified, so Home shows without an idle or identify step.
+  const arrivedAs = (location.state as { reader?: KioskUser } | null)?.reader ?? null;
+  const [state, dispatch] = useReducer(kioskReducer, arrivedAs, (reader) => reader ? kioskReducer(initialKioskState, { type: "LOGIN", user: reader }) : initialKioskState);
   const [clock, setClock] = useState(new Date());
   const [card, setCard] = useState("");
   const [pin, setPin] = useState("");
@@ -111,6 +102,21 @@ export function KioskPage() {
     });
     return () => window.clearInterval(timer);
   }, [refreshBooks]);
+
+  useEffect(() => {
+    // One session for both entrances: a reader signed in elsewhere (or before a reload) skips the idle screen.
+    let cancelled = false;
+    // Drop the hand-over from history, so a reload after logout asks the server instead of reusing it.
+    if (arrivedAs) navigate(location.pathname + location.search, { replace: true, state: null });
+    void (async () => {
+      const reader = arrivedAs ?? await currentReader().catch(() => null);
+      if (cancelled || !reader) return;
+      if (!arrivedAs) dispatch({ type: "LOGIN", user: reader });
+      await refreshLoans();
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     const markActivity = () => {
@@ -334,7 +340,7 @@ export function KioskPage() {
   }
 
   const activeLoans = useMemo(() => state.loans.filter((loan) => ["active", "overdue"].includes(loan.status)), [state.loans]);
-  const today = clock.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" });
+  const today = formatTime(clock);
 
   function startLogoPress() {
     logoLongPressed.current = false;
@@ -372,18 +378,18 @@ export function KioskPage() {
           onPointerLeave={endLogoPress}
           onContextMenu={(event) => event.preventDefault()}
           onClick={(event) => { if (logoLongPressed.current) event.preventDefault(); }}
-          aria-label="登录页 / Login page"
+          aria-label={t("kiosk.header.loginPage")}
         >
           <Logo />
         </Link>
         <div className="kiosk-branch">
-          <strong>{state.branchName}</strong>
-          <span>OPEN 08:00–22:00 · 今日开放 / Open today</span>
+          <strong>{t(`kiosk.branch.${state.branchId}`, { defaultValue: state.branchId })}</strong>
+          <span>{t("kiosk.header.hours", { from: "08:00", to: "22:00" })}</span>
         </div>
         <div className="kiosk-top-actions">
           <div className="kiosk-lang"><LangSwitch /></div>
-          <button className="kiosk-icon-button" onClick={() => dispatch({ type: "NAVIGATE", screen: "help" })} aria-label="Help">?</button>
-          <button className="kiosk-exit" onClick={() => void signOut()}>Log out / 退出</button>
+          <button className="kiosk-icon-button" onClick={() => dispatch({ type: "NAVIGATE", screen: "help" })} aria-label={t("kiosk.header.help")}>?</button>
+          <button className="kiosk-exit" onClick={() => void signOut()}>{t("nav.logout")}</button>
         </div>
       </header>
 
@@ -454,8 +460,9 @@ export function KioskPage() {
 }
 
 function IdleScreen({ time, occupancy, capacity, onStart, scanRef, onScan }: { time: string; occupancy: number; capacity: number; onStart: () => void; scanRef: RefObject<HTMLInputElement | null>; onScan: (value: string) => void }) {
+  const { t } = useTranslation();
   return <section className="kiosk-idle">
-    <input ref={scanRef} className="kiosk-idle-scan-buffer" aria-label="Card scanner input" onKeyDown={(event) => {
+    <input ref={scanRef} className="kiosk-idle-scan-buffer" aria-label={t("kiosk.idle.scanner")} onKeyDown={(event) => {
       if (event.key === "Enter") {
         const value = event.currentTarget.value.trim();
         if (value) onScan(value);
@@ -463,18 +470,18 @@ function IdleScreen({ time, occupancy, capacity, onStart, scanRef, onScan }: { t
       }
     }} />
     <div className="kiosk-idle-copy">
-      <p className="kiosk-eyebrow">QUIET ARCHIVE · SELF-SERVICE</p>
-      <h1>无人值守图书馆<small>Unmanned Library</small></h1>
+      <p className="kiosk-eyebrow">{t("kiosk.idle.eyebrow")}</p>
+      <h1>{t("app.name")}</h1>
       <div className="kiosk-clock">{time}</div>
-      <p className="kiosk-presence">现在馆内 <strong>{occupancy}</strong> 人 / {capacity} 人容量<br /><small>{occupancy < capacity ? "馆内安静开放 / Open and calm" : "当前已满 / Currently full"}</small></p>
-      <button className="kiosk-start" onClick={onStart}>{bilingual("请刷读者证或扫码入馆", "Tap your card or scan QR to enter")}<span>→</span></button>
+      <p className="kiosk-presence"><Trans i18nKey="kiosk.idle.presence" values={{ people: formatNumber(occupancy), capacity: formatNumber(capacity) }} components={{ b: <strong /> }} /><br /><small>{t(occupancy < capacity ? "kiosk.idle.calm" : "kiosk.idle.full")}</small></p>
+      <button className="kiosk-start" onClick={onStart}><span>{t("kiosk.idle.start")}</span><span>→</span></button>
     </div>
-    <div className="kiosk-idle-art"><BookSpines seed={32} /><div className="kiosk-art-label">EAST CAMPUS<br /><span>READING ROOM</span></div></div>
+    <div className="kiosk-idle-art"><BookSpines seed={32} /><div className="kiosk-art-label">{t("kiosk.idle.artPlace")}<br /><span>{t("kiosk.idle.artRoom")}</span></div></div>
   </section>;
 }
 
 function IdentifyScreen({ card, pin, setCard, setPin, onSubmit, error, inputRef, loading }: { card: string; pin: string; setCard: (value: string) => void; setPin: (value: string) => void; onSubmit: () => void; error: string; inputRef: RefObject<HTMLInputElement | null>; loading: boolean }) {
-  return <KioskShell title={screenCopy.identify} onBack={undefined}>
+  return <KioskShell title="identify" onBack={undefined}>
     <div className="kiosk-identify">
       <div className="kiosk-scan-mark">◎</div>
       <h2>刷卡或输入证号<small>Tap your card or enter card number</small></h2>
@@ -487,69 +494,73 @@ function IdentifyScreen({ card, pin, setCard, setPin, onSubmit, error, inputRef,
   </KioskShell>;
 }
 
-function KioskShell({ title, onBack, children }: { title: { zh: string; en: string }; onBack: (() => void) | undefined; children: ReactNode }) {
-  return <section className="kiosk-shell"><div className="kiosk-shell-heading">{onBack ? <button className="kiosk-back" onClick={onBack} aria-label="返回 / Back"><span aria-hidden="true">←</span></button> : null}<h1>{title.zh}<small>{title.en}</small></h1></div>{children}</section>;
+type ShellScreen = Exclude<KioskScreen, "idle" | "home" | "result">;
+
+function KioskShell({ title, onBack, children }: { title: ShellScreen; onBack: (() => void) | undefined; children: ReactNode }) {
+  const { t } = useTranslation();
+  return <section className="kiosk-shell"><div className="kiosk-shell-heading">{onBack ? <button className="kiosk-back" onClick={onBack} aria-label={t("kiosk.nav.back")}><span aria-hidden="true">←</span></button> : null}<h1>{t(`kiosk.screen.${title}`)}</h1></div>{children}</section>;
 }
 
 function BorrowScreen({ onStepBack, ...props }: Parameters<typeof BorrowFlow>[0] & { onStepBack: () => void }) {
-  return <KioskShell title={screenCopy.borrow} onBack={onStepBack}><BorrowFlow {...props} /></KioskShell>;
+  return <KioskShell title="borrow" onBack={onStepBack}><BorrowFlow {...props} /></KioskShell>;
 }
 
 function ReturnScreen({ onBack, ...props }: Parameters<typeof ReturnFlow>[0] & { onBack: () => void }) {
-  return <KioskShell title={screenCopy.return} onBack={onBack}><ReturnFlow {...props} /></KioskShell>;
+  return <KioskShell title="return" onBack={onBack}><ReturnFlow {...props} /></KioskShell>;
 }
 
 function RenewScreen(props: Parameters<typeof RenewFlow>[0]) {
-  return <KioskShell title={screenCopy.renew} onBack={props.onBack}><RenewFlow {...props} /></KioskShell>;
+  return <KioskShell title="renew" onBack={props.onBack}><RenewFlow {...props} /></KioskShell>;
 }
 
 function ReserveScreen({ onBack, ...props }: Parameters<typeof ReserveFlow>[0] & { onBack: () => void }) {
-  return <KioskShell title={screenCopy.reserve} onBack={onBack}><ReserveFlow {...props} /></KioskShell>;
+  return <KioskShell title="reserve" onBack={onBack}><ReserveFlow {...props} /></KioskShell>;
 }
 
 function LoansScreen({ onBack, ...props }: Parameters<typeof LoansFlow>[0] & { onBack: () => void }) {
-  return <KioskShell title={screenCopy.loans} onBack={onBack}><LoansFlow {...props} /></KioskShell>;
+  return <KioskShell title="loans" onBack={onBack}><LoansFlow {...props} /></KioskShell>;
 }
 
 type SupportStatus = "idle" | "sent" | "queued";
 
 const HELP_STEPS = [
   {
-    zh: "刷读者证", en: "Tap your card",
+    key: "card",
     art: <svg viewBox="0 0 96 72" aria-hidden="true"><rect x="10" y="40" width="76" height="12" rx="6" className="is-fill" /><rect x="24" y="8" width="48" height="34" rx="5" /><path d="M24 18h48" /><rect x="30" y="24" width="10" height="12" rx="2" /><path d="M46 28h18M46 34h12" /><path d="M78 20a10 10 0 0 1 0 12M84 15a17 17 0 0 1 0 22" className="is-accent" /></svg>
   },
   {
-    zh: "把书放在感应区", en: "Place books on the tray",
+    key: "tray",
     art: <svg viewBox="0 0 96 72" aria-hidden="true"><rect x="10" y="54" width="76" height="8" rx="4" className="is-fill" /><rect x="34" y="14" width="26" height="38" rx="3" /><path d="M40 14v38" /><circle cx="47" cy="33" r="22" className="is-accent is-dashed" /></svg>
   },
   {
-    zh: "确认并取走小票", en: "Confirm and take the receipt",
+    key: "receipt",
     art: <svg viewBox="0 0 96 72" aria-hidden="true"><rect x="18" y="8" width="60" height="16" rx="4" className="is-fill" /><path d="M28 24v40l6-4 6 4 6-4 6 4 6-4 6 4V24" /><path d="M36 40l7 7 14-14" className="is-accent" /></svg>
   }
 ];
 
 function HelpScreen({ onCall, onBack, busy, support }: { onCall: () => void; onBack: () => void; busy: boolean; support: SupportStatus }) {
+  const { t } = useTranslation();
   const confirmRef = useRef<HTMLParagraphElement>(null);
   // Keep the confirmation clear of the fixed bottom navigation on short screens.
   useEffect(() => {
     if (support !== "idle") confirmRef.current?.scrollIntoView?.({ block: "nearest" });
   }, [support]);
-  return <KioskShell title={screenCopy.help} onBack={onBack}>
+  return <KioskShell title="help" onBack={onBack}>
     <div className="kiosk-help">
       <ol className="kiosk-help-steps">
         {HELP_STEPS.map((step, index) => (
-          <li key={step.en}>
+          <li key={step.key}>
             <span className="kiosk-help-art">{step.art}</span>
             <b>{index + 1}</b>
-            <span>{step.zh}<small>{step.en}</small></span>
+            <span>{t(`kiosk.help.step.${step.key}`)}</span>
           </li>
         ))}
       </ol>
-      <p>设备故障或需要人工协助？<br /><small>Device fault or need a person?</small></p>
-      <Button loading={busy} onClick={onCall}>呼叫远程支持 / Call remote support</Button>
+      <p>{t("kiosk.help.fault")}</p>
+      <Button loading={busy} onClick={onCall}>{t("kiosk.help.call")}</Button>
       <p ref={confirmRef} className={`kiosk-help-confirm ${support !== "idle" ? "is-on" : ""}`} role="status">
-        {support === "sent" ? <><CheckIcon />已呼叫远程支持，馆员会尽快回应，请留在自助机旁<small>Support called. A librarian will respond shortly; please stay at the kiosk.</small></> : null}
-        {support === "queued" ? <><InfoIcon />请求已记录，网络恢复后会通知馆员<small>Request noted. It will reach a librarian when the network is back.</small></> : null}
+        {support === "sent" ? <><CheckIcon />{t("kiosk.help.sent")}</> : null}
+        {support === "queued" ? <><InfoIcon />{t("kiosk.help.queued")}</> : null}
       </p>
     </div>
   </KioskShell>;
@@ -557,18 +568,17 @@ function HelpScreen({ onCall, onBack, busy, support }: { onCall: () => void; onB
 
 /** Bottom-left navigation on every screen except idle and home. Back steps back one screen; Home keeps the session. */
 function KioskNav({ onBack, onHome }: { onBack: () => void; onHome?: () => void }) {
-  const { t, i18n } = useTranslation();
-  const other = i18n.getFixedT(i18n.language === "en" ? "zh-CN" : "en");
+  const { t } = useTranslation();
   return (
     <nav className="kiosk-nav" aria-label={t("kiosk.nav.label")}>
       <button type="button" className="kiosk-nav-back" onClick={onBack}>
         <span aria-hidden="true">←</span>
-        <span>{t("kiosk.nav.back")}<small>{other("kiosk.nav.back")}</small></span>
+        <span>{t("kiosk.nav.back")}</span>
       </button>
       {onHome ? (
         <button type="button" className="kiosk-nav-home" onClick={onHome}>
           <span aria-hidden="true">⌂</span>
-          <span>{t("kiosk.nav.home")}<small>{other("kiosk.nav.home")}</small></span>
+          <span>{t("kiosk.nav.home")}</span>
         </button>
       ) : null}
     </nav>

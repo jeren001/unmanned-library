@@ -336,7 +336,7 @@ function AdminShell({ user }: { user: SessionUser }) {
               value={theme === "dark" ? t("theme.dark") : t("theme.light")}
               onChange={(label) => setTheme(label === t("theme.dark") ? "dark" : "light")}
             />
-            <Button variant="ghost" onClick={() => void signOut()}>Log out / 退出</Button>
+            <Button variant="ghost" onClick={() => void signOut()}>{t("nav.logout")}</Button>
           </div>
         </header>
 

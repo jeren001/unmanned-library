@@ -39,7 +39,7 @@ test("home renders the catalogue layout in one language", async ({ page }) => {
   await expect(tiles.first()).toHaveCSS("opacity", "1");
 
   // Help lives in the header; the voice toggle is gone.
-  await expect(page.getByRole("button", { name: "Help", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: /^(帮助|Help)$/ })).toBeVisible();
   await expect(page.getByRole("button", { name: /Voice/ })).toHaveCount(0);
   await expect(page.getByText(/^[声静]$/)).toHaveCount(0);
 

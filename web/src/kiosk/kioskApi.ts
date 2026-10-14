@@ -130,6 +130,12 @@ export async function loginPassword(cardNumber: string, password: string) {
   return response.user;
 }
 
+/** The reader already signed in on this browser (e.g. via /login), or null for no session or a staff session. */
+export async function currentReader() {
+  const { user } = await request<{ user: (Omit<KioskUser, "role"> & { role: string }) | null }>("/api/auth/me");
+  return user?.role === "reader" ? user as KioskUser : null;
+}
+
 export async function logout() {
   await request("/api/auth/logout", { method: "POST" });
 }

@@ -1,4 +1,5 @@
 import type { BookStatus } from "../shared/components";
+import { formatDate as formatLocalDate } from "../shared/i18n";
 import { AlertIcon } from "../shared/icons";
 import type { Book, Loan } from "./kioskState";
 import "./kiosk-ui.css";
@@ -7,8 +8,9 @@ import "./kiosk-ui.css";
 
 const DAY_MS = 86400000;
 
+/** Month and day in the selected UI language ("11月13日" / "Nov 13"). */
 export function formatDate(value: string | Date) {
-  return new Intl.DateTimeFormat("zh-CN", { month: "short", day: "numeric" }).format(new Date(value));
+  return formatLocalDate(value);
 }
 
 export function callNumberOf(book: Book) {

@@ -47,7 +47,7 @@ test("borrow, renew, return and offline outbox sync", async ({ page }) => {
   await expect(page.getByText(/归还成功|Returned/)).toBeVisible();
   await page.getByRole("button", { name: /返回首页|Back to home/ }).click();
 
-  await page.getByRole("link", { name: "登录页 / Login page" }).click({ delay: 950 });
+  await page.getByRole("link", { name: /^(登录页|Login page)$/ }).click({ delay: 950 });
   await page.getByRole("button", { name: /断开网络|Go offline/ }).click();
   await page.locator("[data-service=borrow]").click();
   await page.getByPlaceholder("RFID-000001 / ISBN").fill("RFID-000002");
@@ -58,7 +58,7 @@ test("borrow, renew, return and offline outbox sync", async ({ page }) => {
   await expect(page.getByText(/已保存 1 笔操作|1 saved/)).toBeVisible();
   await capture(page, "offline-result");
 
-  await page.getByRole("link", { name: "登录页 / Login page" }).click({ delay: 950 });
+  await page.getByRole("link", { name: /^(登录页|Login page)$/ }).click({ delay: 950 });
   await page.getByRole("button", { name: /恢复网络|Go online/ }).click();
   await expect(page.getByText(/已同步|Synced/)).toBeVisible({ timeout: 10_000 });
 });

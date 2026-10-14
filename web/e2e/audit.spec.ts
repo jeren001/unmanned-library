@@ -267,10 +267,10 @@ test("kiosk 1080x1920", async ({ browser }) => {
     await page.locator(selector).click();
     await settle(page);
     await audit(page, `kiosk-${name}`, { focus: name === "borrow" });
-    await page.getByRole("button", { name: "返回 / Back" }).click();
+    await page.locator(".kiosk-shell-heading .kiosk-back").click();
     await settle(page, 500);
   }
-  await page.getByRole("button", { name: "Help", exact: true }).click();
+  await page.getByRole("button", { name: /^(帮助|Help)$/ }).click();
   await settle(page);
   await audit(page, "kiosk-help");
   await context.close();
@@ -359,7 +359,7 @@ test("kiosk frame rate", async ({ browser }) => {
     await page.getByPlaceholder("RFID-000001 / ISBN").fill("RFID-000003");
     await page.getByRole("button", { name: /添加.*Add/ }).click();
   });
-  await measure("back-home", async () => { await page.getByRole("button", { name: "返回 / Back" }).click(); });
+  await measure("back-home", async () => { await page.locator(".kiosk-shell-heading .kiosk-back").click(); });
   report.kioskFrames = frames;
   await context.close();
 });
