@@ -940,3 +940,65 @@
     animation: none;
   }
 }
+
+/* Demo-mode reader picker ("Simulate scan" on /login and the kiosk identify screen). */
+.demo-reader-picker {
+  position: relative;
+  display: inline-flex;
+}
+
+.demo-reader-popover {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 8px);
+  left: 0;
+  min-width: 240px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-panel);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 12px 32px color-mix(in srgb, var(--burgundy-deep) 18%, transparent);
+  text-align: left;
+}
+
+.demo-reader-title {
+  margin: 4px 8px 6px;
+  color: var(--text-2);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.demo-reader-popover ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.demo-reader-option {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.demo-reader-option:hover,
+.demo-reader-option:focus-visible {
+  background: var(--accent-soft);
+  color: var(--accent);
+  outline: none;
+}
+
+.demo-reader-option .mono {
+  color: var(--text-2);
+  font-family: var(--font-mono);
+}

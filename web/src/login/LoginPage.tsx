@@ -3,6 +3,8 @@ import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
 import { Button, LangSwitch, SegmentedControl, Tabs, TextField } from "../shared/components";
 import { AlertIcon } from "../shared/icons";
+import { DEMO_MODE } from "../shared/demoMode";
+import { DemoReaderPicker } from "../shared/DemoReaderPicker";
 import { BookSpinesBand, PageTurn, prefersReducedMotion } from "../shared/motion";
 import { cardLogin, destinationFor, LoginError, loginErrorMessage, passwordLogin, type Role, type SessionUser } from "./loginApi";
 import "./login.css";
@@ -14,9 +16,8 @@ type ReaderPhase = "idle" | "reading" | "accepted" | "rejected";
 type Message = { key: string; values?: Record<string, number> };
 
 const THEME_KEY = "ul-login-theme";
-const SIMULATED_CARD = "20240001";
 
-// Prefill buttons for development builds; mirrored in docs/DEMO_ACCOUNTS.md.
+// Prefill buttons shown only in demo mode (VITE_DEMO_MODE); mirrored in docs/DEMO_ACCOUNTS.md.
 const demoAccounts: Record<StaffRole, { account: string; password: string }> = {
   librarian: { account: "librarian", password: "librarian123" },
   admin: { account: "admin", password: "admin123" }
@@ -207,17 +208,14 @@ function ReaderLogin({ focusOnMount, onSuccess }: { focusOnMount: boolean; onSuc
           />
           <div className="login-actions">
             <Button type="submit" loading={phase === "reading"}>{t("login.reader.submit")}</Button>
-            <Button
-              type="button"
-              variant="ghost"
+            {/* Signs in as a chosen demo reader, so it is a demo-mode convenience only (renders nothing otherwise). */}
+            <DemoReaderPicker
               disabled={busy}
-              onClick={() => {
-                setCardNumber(SIMULATED_CARD);
-                void scan(SIMULATED_CARD);
+              onPick={(card) => {
+                setCardNumber(card);
+                void scan(card);
               }}
-            >
-              {t("login.reader.simulate")}
-            </Button>
+            />
           </div>
         </form>
       </div>
@@ -268,7 +266,7 @@ function StaffLogin({ role, onSuccess }: { role: StaffRole; onSuccess: (user: Se
         <TextField
           label={t("login.staff.account")}
           name="username"
-          autoComplete="username"
+          autoComplete="off"
           placeholder={t("login.staff.accountPlaceholder")}
           value={account}
           error={fieldErrors.account && t(fieldErrors.account)}
@@ -279,7 +277,7 @@ function StaffLogin({ role, onSuccess }: { role: StaffRole; onSuccess: (user: Se
             label={t("login.staff.password")}
             name="password"
             type={showPassword ? "text" : "password"}
-            autoComplete="current-password"
+            autoComplete="new-password"
             value={password}
             error={fieldErrors.password && t(fieldErrors.password)}
             onChange={(event) => setPassword(event.target.value)}
@@ -306,7 +304,7 @@ function StaffLogin({ role, onSuccess }: { role: StaffRole; onSuccess: (user: Se
         <Button type="submit" loading={loading} disabled={isLocked}>{t("login.staff.submit")}</Button>
       </form>
 
-      {!import.meta.env.PROD ? (
+      {DEMO_MODE ? (
         <p className="login-demo">
           <span>{t("login.demo")}</span>
           <button

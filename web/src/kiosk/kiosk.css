@@ -1229,3 +1229,17 @@
   .kiosk-help-steps { grid-template-columns: 1fr; }
   .kiosk-help-steps li + li { border-left: 0; border-top: 1px solid var(--line); }
 }
+
+.kiosk-demo-readers {
+  justify-self: center;
+}
+
+/* Opens upward so the fixed bottom navigation never covers it. */
+.kiosk-demo-readers .demo-reader-popover {
+  top: auto;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  min-width: 320px;
+  font-size: 18px;
+}

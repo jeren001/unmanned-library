@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type Dis
 import { Trans, useTranslation } from "react-i18next";
 import { Link, useLocation, useNavigate } from "react-router";
 import { BookSpines, Button, LangSwitch, Logo } from "../shared/components";
+import { DemoReaderPicker } from "../shared/DemoReaderPicker";
 import { formatDate as formatLocalDate, formatNumber, formatTime } from "../shared/i18n";
 import { AlertIcon, CheckIcon, CloseIcon, InfoIcon, OfflineIcon } from "../shared/icons";
 import {
@@ -182,16 +183,16 @@ export function KioskPage() {
 
   const back = () => dispatch({ type: "BACK" });
 
-  async function identify() {
+  async function identify(number = card) {
     dispatch({ type: "CLEAR_ERROR" });
-    if (!card.trim()) {
+    if (!number.trim()) {
       dispatch({ type: "INPUT_ERROR", message: "kiosk.error.cardRequired" });
       identifyRef.current?.focus();
       return;
     }
     setBusy(true);
     try {
-      const user = pin ? await loginPassword(card.trim(), pin) : await loginCard(card.trim());
+      const user = pin ? await loginPassword(number.trim(), pin) : await loginCard(number.trim());
       dispatch({ type: "LOGIN", user });
       await refreshBooks();
       await refreshLoans();
@@ -413,7 +414,7 @@ export function KioskPage() {
       {state.screen === "idle" ? (
         idleScreen
       ) : state.screen === "identify" ? (
-        <IdentifyScreen card={card} pin={pin} setCard={setCard} setPin={setPin} onSubmit={() => void identify()} error={state.error || state.inputError} inputRef={identifyRef} loading={busy} />
+        <IdentifyScreen card={card} pin={pin} setCard={setCard} setPin={setPin} onSubmit={() => void identify()} onDemoPick={(number) => { setCard(number); void identify(number); }} error={state.error || state.inputError} inputRef={identifyRef} loading={busy} />
       ) : state.screen === "home" && state.user ? (
         homeScreen
       ) : state.screen === "borrow" && state.user ? (
@@ -489,7 +490,7 @@ function IdleScreen({ time, occupancy, capacity, onStart, scanRef, onScan }: { t
   </section>;
 }
 
-function IdentifyScreen({ card, pin, setCard, setPin, onSubmit, error, inputRef, loading }: { card: string; pin: string; setCard: (value: string) => void; setPin: (value: string) => void; onSubmit: () => void; error: string; inputRef: RefObject<HTMLInputElement | null>; loading: boolean }) {
+function IdentifyScreen({ card, pin, setCard, setPin, onSubmit, onDemoPick, error, inputRef, loading }: { card: string; pin: string; setCard: (value: string) => void; setPin: (value: string) => void; onSubmit: () => void; onDemoPick: (card: string) => void; error: string; inputRef: RefObject<HTMLInputElement | null>; loading: boolean }) {
   const text = useKioskText();
   return <KioskShell title="identify" onBack={undefined}>
     <div className="kiosk-identify">
@@ -499,6 +500,7 @@ function IdentifyScreen({ card, pin, setCard, setPin, onSubmit, error, inputRef,
       <label className="kiosk-pin-field"><span>PIN（可选） / Optional PIN</span><input inputMode="numeric" value={pin} onChange={(event) => setPin(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") onSubmit(); }} placeholder="••••" /></label>
       {error ? <p className="kiosk-error" role="alert"><AlertIcon />{text(error)}</p> : null}
       <Button loading={loading} onClick={onSubmit}>{bilingual("继续", "Continue")}</Button>
+      <DemoReaderPicker className="kiosk-demo-readers" disabled={loading} onPick={onDemoPick} />
       <p className="kiosk-hint">支持读者证、二维码和键盘扫码器<br /><small>Cards, QR codes, and keyboard barcode scanners supported</small></p>
     </div>
   </KioskShell>;
