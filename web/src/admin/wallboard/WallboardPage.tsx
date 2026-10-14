@@ -359,7 +359,7 @@ export function WallboardPage() {
 
       <section className={`wb-panel wb-alert-panel ${hasCritical ? "has-critical" : ""}`} aria-label={t("admin.wallboard.alerts")}>
         <h2>{t("admin.wallboard.alerts")}<small className="mono">{openAlerts.length} / {alerts.length}</small></h2>
-        <AlertFeed alerts={alerts} fresh={freshAlerts} devices={devices} onAck={(alert) => void acknowledge(alert)} busyId={busyAlert} />
+        <AlertFeed alerts={alerts} fresh={freshAlerts} devices={devices} branchName={(id) => { const branch = branches.find((item) => item.id === id); return branch ? (i18n.language === "en" ? branch.name_en : branch.name_zh) : id; }} onAck={(alert) => void acknowledge(alert)} busyId={busyAlert} />
       </section>
 
       <section className="wb-panel wb-device-panel" aria-label={t("admin.wallboard.devices")}>

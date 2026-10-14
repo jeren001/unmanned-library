@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { animate, easing, usePrefersReducedMotion } from "../../shared/motion";
 import type { AlertFull, DeviceRow } from "../adminApi";
 import { RelativeTime } from "../adminUi";
+import { alertMessage, deviceLabel } from "../alertText";
 import { ENV_UNITS, envLevel, sparklinePoints, type EnvMetric, type FlowNode } from "./wallboardData";
 
 /* ---------- Rolling (odometer) number ---------- */
@@ -93,7 +94,7 @@ function MatrixCell({ device, flash }: { device: DeviceRow; flash?: number }) {
 
 /* ---------- Alert feed ---------- */
 
-export function AlertFeed({ alerts, fresh, devices, onAck, busyId }: { alerts: AlertFull[]; fresh: Set<string>; devices: Map<string, DeviceRow>; onAck: (alert: AlertFull) => void; busyId: string | null }) {
+export function AlertFeed({ alerts, fresh, devices, branchName, onAck, busyId }: { alerts: AlertFull[]; fresh: Set<string>; devices: Map<string, DeviceRow>; branchName: (id: string) => string; onAck: (alert: AlertFull) => void; busyId: string | null }) {
   const { t } = useTranslation();
   const reduced = usePrefersReducedMotion();
   const listRef = useRef<HTMLOListElement>(null);
@@ -129,12 +130,12 @@ export function AlertFeed({ alerts, fresh, devices, onAck, busyId }: { alerts: A
       onFocus={() => { paused.current = true; }}
       onBlur={() => { paused.current = false; }}
     >
-      {alerts.map((alert) => <FeedItem key={alert.id} alert={alert} fresh={fresh.has(alert.id)} device={alert.device_id ? devices.get(alert.device_id) : undefined} onAck={onAck} busy={busyId === alert.id} />)}
+      {alerts.map((alert) => <FeedItem key={alert.id} alert={alert} fresh={fresh.has(alert.id)} device={alert.device_id ? devices.get(alert.device_id) : undefined} branchName={branchName} onAck={onAck} busy={busyId === alert.id} />)}
     </ol>
   );
 }
 
-function FeedItem({ alert, fresh, device, onAck, busy }: { alert: AlertFull; fresh: boolean; device?: DeviceRow; onAck: (alert: AlertFull) => void; busy: boolean }) {
+function FeedItem({ alert, fresh, device, branchName, onAck, busy }: { alert: AlertFull; fresh: boolean; device?: DeviceRow; branchName: (id: string) => string; onAck: (alert: AlertFull) => void; busy: boolean }) {
   const { t } = useTranslation();
   const ref = useRef<HTMLLIElement>(null);
   useLayoutEffect(() => {
@@ -147,8 +148,8 @@ function FeedItem({ alert, fresh, device, onAck, busy }: { alert: AlertFull; fre
     <li ref={ref} className={`wb-alert is-${alert.severity} is-${alert.status} ${pulsing ? "is-pulsing" : ""}`}>
       <span className="wb-alert-sev">{t(`admin.severity.${alert.severity}`)}</span>
       <div>
-        <b>{alert.message}</b>
-        <small>{t(`admin.alertType.${alert.type}`, { defaultValue: alert.type })}{device ? ` · ${device.name}` : ""} · <RelativeTime value={alert.created_at} /></small>
+        <b>{alertMessage(t, alert, branchName(alert.branch_id))}</b>
+        <small>{t(`admin.alertType.${alert.type}`, { defaultValue: alert.type })}{device ? ` · ${deviceLabel(t, device)}` : ""} · <RelativeTime value={alert.created_at} /></small>
       </div>
       {alert.status === "open"
         ? <button type="button" onClick={() => onAck(alert)} disabled={busy}>{t("admin.alertsPage.ack")}</button>

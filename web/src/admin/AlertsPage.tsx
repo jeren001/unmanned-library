@@ -8,6 +8,7 @@ import {
   type AlertFull, type AlertStatus, type ClipRow, type DeviceRow, type MaintenanceRow
 } from "./adminApi";
 import { useAdmin, useAdminEvent } from "./adminContext";
+import { alertMessage, deviceLabel } from "./alertText";
 import { ErrorPanel, errorText, formatDate, PageHeading, RelativeTime } from "./adminUi";
 import "./ops.css";
 
@@ -61,7 +62,7 @@ export function AlertsPage() {
     setBusyId(alert.id);
     try {
       const updated = action === "ack" ? await ackAlert(alert.id) : await resolveAlert(alert.id);
-      toast({ tone: "success", title: t(action === "ack" ? "admin.alertsPage.acked" : "admin.alertsPage.resolved"), body: alert.message });
+      toast({ tone: "success", title: t(action === "ack" ? "admin.alertsPage.acked" : "admin.alertsPage.resolved"), body: alertMessage(t, alert, branchName(alert.branch_id)) });
       if (selected?.id === alert.id) setSelected({ ...alert, ...updated });
       await load(false);
     } catch (caught) {
@@ -168,8 +169,8 @@ function AlertCard({ alert, fresh, device, branch, busy, onOpen, onAct }: {
           <b>{t(`admin.alertType.${alert.type}`, { defaultValue: alert.type })}</b>
           <RelativeTime value={alert.created_at} />
         </span>
-        <span className="admin-alert-message">{alert.message}</span>
-        <span className="admin-alert-meta">{branch}{device ? ` · ${device.name}` : ""}{alert.related_clip_id ? ` · ${t("admin.alertsPage.hasClip")}` : ""}</span>
+        <span className="admin-alert-message">{alertMessage(t, alert, branch)}</span>
+        <span className="admin-alert-meta">{branch}{device ? ` · ${deviceLabel(t, device)}` : ""}{alert.related_clip_id ? ` · ${t("admin.alertsPage.hasClip")}` : ""}</span>
       </button>
       {alert.status !== "resolved" ? (
         <div className="admin-alert-actions">
@@ -210,10 +211,10 @@ function AlertDetail({ alert, device, branch, busy, onAct }: { alert: AlertFull;
     <div className="admin-detail">
       <div className={`admin-alert-summary is-${alert.severity}`}>
         <StatusBadge tone={SEVERITY_TONE[alert.severity]} label={t(`admin.severity.${alert.severity}`)} />
-        <p>{alert.message}</p>
+        <p>{alertMessage(t, alert, branch)}</p>
         <dl className="admin-detail-extra">
           <dt>{t("admin.branch")}</dt><dd>{branch}</dd>
-          <dt>{t("admin.alertsPage.device")}</dt><dd>{device ? device.name : alert.device_id ?? "—"}</dd>
+          <dt>{t("admin.alertsPage.device")}</dt><dd>{device ? deviceLabel(t, device) : alert.device_id ?? "—"}</dd>
           <dt>{t("admin.alertsPage.raised")}</dt><dd className="mono">{alert.created_at.replace("T", " ").slice(0, 16)}</dd>
           <dt>{t("catalog.status")}</dt><dd>{t(`admin.alertStatus.${alert.status}`)}</dd>
           <dt>ID</dt><dd className="mono">{alert.id}</dd>
@@ -286,7 +287,7 @@ export function ClipPlayer({ alert, device }: { alert: AlertFull; device?: Devic
   if (data.url) {
     return (
       <figure className="admin-clip">
-        <video controls preload="metadata" src={data.url} aria-label={t("admin.clip.label", { device: device?.name ?? data.device_id ?? "" })} />
+        <video controls preload="metadata" src={data.url} aria-label={t("admin.clip.label", { device: (device ? deviceLabel(t, device) : null) ?? data.device_id ?? "" })} />
         <figcaption className="mono">{formatDate(data.start_ts)} {data.start_ts.slice(11, 19)} – {data.end_ts.slice(11, 19)}</figcaption>
       </figure>
     );
@@ -297,7 +298,7 @@ export function ClipPlayer({ alert, device }: { alert: AlertFull; device?: Devic
 
   return (
     <figure className="admin-clip">
-      <div className="admin-clip-screen" role="img" aria-label={t("admin.clip.simulatedLabel", { device: device?.name ?? data.device_id ?? "" })}>
+      <div className="admin-clip-screen" role="img" aria-label={t("admin.clip.simulatedLabel", { device: (device ? deviceLabel(t, device) : null) ?? data.device_id ?? "" })}>
         <svg viewBox="0 0 320 180" preserveAspectRatio="none" aria-hidden="true">
           <rect width="320" height="180" fill="#120A0B" />
           {Array.from({ length: 5 }, (_, index) => <rect key={index} x={20 + index * 60} y="40" width="40" height="110" fill="#2A1A1C" />)}
@@ -308,7 +309,7 @@ export function ClipPlayer({ alert, device }: { alert: AlertFull; device?: Devic
           </g>
           {Math.abs(progress - alertAt) < 0.08 ? <rect x="2" y="2" width="316" height="176" fill="none" stroke="#D6384F" strokeWidth="4" /> : null}
         </svg>
-        <span className="admin-clip-rec"><i />REC · {device?.name ?? data.device_id ?? "CAM"}</span>
+        <span className="admin-clip-rec"><i />REC · {(device ? deviceLabel(t, device) : null) ?? data.device_id ?? "CAM"}</span>
         <span className="admin-clip-time mono">{stamp.replace("T", " ").slice(0, 19)}</span>
         <span className="admin-clip-sim">{t("admin.clip.simulated")}</span>
       </div>

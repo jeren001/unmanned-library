@@ -4,6 +4,8 @@ import { useNavigate } from "react-router";
 import { Button, EmptyState, Skeleton, StatusBadge, useToast } from "../shared/components";
 import { CountUp, StaggerList } from "../shared/motion";
 import { fetchOpenAlerts, fetchOverview, fetchRules, listPage, saveRule, type AlertRow, type LoanRow, type Overview, type RuleRow } from "./adminApi";
+import { useAdmin } from "./adminContext";
+import { alertMessage } from "./alertText";
 import { ErrorPanel, errorText, formatDate, PageHeading } from "./adminUi";
 import { LookupName } from "./ListPages";
 
@@ -37,6 +39,7 @@ const SEVERITY_TONE = { info: "info", warning: "warn", critical: "danger" } as c
 
 export function OverviewPage({ branchId, refreshKey }: { branchId: string; refreshKey: number }) {
   const { t } = useTranslation();
+  const { branchName } = useAdmin();
   const navigate = useNavigate();
   const overview = useLoad(fetchOverview, [refreshKey]);
   const alerts = useLoad(() => fetchOpenAlerts(branchId).then((rows) => rows.slice(0, 5)), [branchId, refreshKey]);
@@ -72,7 +75,7 @@ export function OverviewPage({ branchId, refreshKey }: { branchId: string; refre
               {alerts.data.map((alert: AlertRow) => (
                 <li key={alert.id}>
                   <StatusBadge tone={SEVERITY_TONE[alert.severity] ?? "info"} label={t(`admin.severity.${alert.severity}`)} />
-                  <span>{alert.message}</span>
+                  <span>{alertMessage(t, alert, branchName(alert.branch_id))}</span>
                   <time className="mono">{formatDate(alert.created_at)}</time>
                 </li>
               ))}

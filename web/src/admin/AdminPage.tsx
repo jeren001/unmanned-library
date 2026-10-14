@@ -8,6 +8,7 @@ import { NotFoundPage } from "../shared/NotFoundPage";
 import { ApiError, fetchBranches, fetchMe, fetchOpenAlerts, logout, type AlertRow, type Branch, type Role, type SessionUser } from "./adminApi";
 import { ErrorPanel, formatDate } from "./adminUi";
 import { AdminContext, AdminEventHub, type AdminContextValue } from "./adminContext";
+import { alertMessage } from "./alertText";
 import { CommandPalette, type Command } from "./CommandPalette";
 import { BooksPage, CirculationPage, ReadersPage } from "./ListPages";
 import { AlertsPage } from "./AlertsPage";
@@ -318,7 +319,7 @@ function AdminShell({ user }: { user: SessionUser }) {
                     {alerts.map((alert) => (
                       <li key={alert.id}>
                         <StatusBadge tone={alert.severity === "critical" ? "danger" : alert.severity === "warning" ? "warn" : "info"} label={t(`admin.severity.${alert.severity}`)} />
-                        <span>{alert.message}</span>
+                        <span>{alertMessage(t, alert, context.branchName(alert.branch_id))}</span>
                         <time className="mono">{formatDate(alert.created_at)}</time>
                       </li>
                     ))}
