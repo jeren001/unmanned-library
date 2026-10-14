@@ -154,17 +154,19 @@ function readCookie(req: Request, name: string) {
   return undefined;
 }
 
-function setSessionCookie(res: Response, sessionId: string, remember = false) {
-  const maxAge = remember ? 60 * 60 * 24 * 14 : 60 * 60 * 8;
-  const secure = process.env.NODE_ENV === "production" ? "; Secure" : "";
-  res.setHeader(
-    "Set-Cookie",
-    `${SESSION_COOKIE}=${encodeURIComponent(sessionId)}; Max-Age=${maxAge}; Path=/; HttpOnly; SameSite=Lax${secure}`
-  );
+/** Session cookie flags: never readable from JS, not sent on cross-site POSTs, HTTPS-only in production. */
+export function sessionCookieAttributes(env: string | undefined = process.env.NODE_ENV) {
+  return `Path=/; HttpOnly; SameSite=Lax${env === "production" ? "; Secure" : ""}`;
 }
 
+function setSessionCookie(res: Response, sessionId: string, remember = false) {
+  const maxAge = remember ? 60 * 60 * 24 * 14 : 60 * 60 * 8;
+  res.setHeader("Set-Cookie", `${SESSION_COOKIE}=${encodeURIComponent(sessionId)}; Max-Age=${maxAge}; ${sessionCookieAttributes()}`);
+}
+
+/** Expires the cookie with the same flags it was set with, so browsers replace it on log out. */
 function clearSessionCookie(res: Response) {
-  res.setHeader("Set-Cookie", `${SESSION_COOKIE}=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax`);
+  res.setHeader("Set-Cookie", `${SESSION_COOKIE}=; Max-Age=0; ${sessionCookieAttributes()}`);
 }
 
 function createSession(user: User, remember = false) {

@@ -50,6 +50,35 @@ describe("CirculationService", () => {
     expect(() => services.circulation.renew({ loanId: loan.id })).toThrow("reserved by another reader");
     db.close();
   });
+
+  it("leaves the book on_shelf when the loan insert fails", () => {
+    const { db, repo, services } = fixture();
+    db.exec("CREATE TRIGGER fail_loan_insert BEFORE INSERT ON loans BEGIN SELECT RAISE(ABORT, 'loan insert failed'); END");
+    expect(() => services.circulation.borrow({ bookId: "book-1", userId: "reader-1", branchId: "branch-1", deviceId: "device-1", idempotencyKey: "idem-fail" })).toThrow("loan insert failed");
+    expect(repo.findBook("book-1")?.status).toBe("on_shelf");
+    expect(repo.count("loans", "book_id = @bookId", { bookId: "book-1" })).toBe(0);
+    db.close();
+  });
+
+  it("leaves the book borrowed and the loan open when closing the loan fails on return", () => {
+    const { db, repo, services } = fixture();
+    const loan = services.circulation.borrow({ bookId: "book-1", userId: "reader-1", idempotencyKey: "idem-return-fail" }) as { id: string };
+    db.exec("CREATE TRIGGER fail_loan_update BEFORE UPDATE ON loans BEGIN SELECT RAISE(ABORT, 'loan update failed'); END");
+    expect(() => services.circulation.returnLoan({ loanId: loan.id })).toThrow("loan update failed");
+    expect(repo.findBook("book-1")?.status).toBe("borrowed");
+    expect((repo.get("loans", loan.id) as { status: string }).status).toBe("active");
+    db.close();
+  });
+
+  it("rejects an unknown device or branch with a not-found error before writing", () => {
+    const { db, repo, services } = fixture();
+    const borrow = (extra: { branchId?: string; deviceId?: string }) => () => services.circulation.borrow({ bookId: "book-1", userId: "reader-1", idempotencyKey: `idem-${JSON.stringify(extra)}`, ...extra });
+    expect(borrow({ deviceId: "device-missing" })).toThrow(expect.objectContaining({ code: "DEVICE_NOT_FOUND" }));
+    expect(borrow({ branchId: "branch-missing" })).toThrow(expect.objectContaining({ code: "BRANCH_NOT_FOUND" }));
+    expect(repo.findBook("book-1")?.status).toBe("on_shelf");
+    expect(repo.count("loans", "book_id = @bookId", { bookId: "book-1" })).toBe(0);
+    db.close();
+  });
 });
 
 describe("TelemetryService", () => {

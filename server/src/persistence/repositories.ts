@@ -82,6 +82,11 @@ export class LibraryRepository {
     return this.get(table, recordId);
   }
 
+  /** Runs `work` in one SQLite transaction: every write commits together, or none does if it throws. */
+  transaction<T>(work: () => T): T {
+    return this.db.transaction(work)();
+  }
+
   delete(table: string, recordId: string) {
     assertMutable(table);
     this.db.prepare(`DELETE FROM ${table} WHERE id = ?`).run(recordId);

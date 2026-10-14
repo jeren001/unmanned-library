@@ -38,24 +38,30 @@ export class CirculationService {
     if (book.status !== "on_shelf") throw new DomainError("BOOK_UNAVAILABLE", "Book is not available");
     const activeCount = this.repo.count("loans", "user_id = @userId AND status IN ('active','overdue')", { userId: input.userId });
     if (activeCount >= this.policy.values().maxLoans) throw new DomainError("MAX_LOANS_REACHED", "Reader has reached the loan limit");
+    // Unknown references would only fail later on a foreign key (HTTP 500); reject them up front as 404.
+    if (input.branchId && !this.repo.get("branches", input.branchId)) throw new DomainError("BRANCH_NOT_FOUND", "Branch not found");
+    if (input.deviceId && !this.repo.get("devices", input.deviceId)) throw new DomainError("DEVICE_NOT_FOUND", "Device not found");
 
     const borrowedAt = new Date();
     const dueAt = new Date(borrowedAt);
     dueAt.setDate(dueAt.getDate() + this.policy.values().loanDays);
     assertBookTransition(book.status as BookStatus, "borrowed");
-    this.repo.update("books", input.bookId, { status: "borrowed" });
-    const loan = this.repo.insert("loans", {
-      id: randomUUID(),
-      book_id: input.bookId,
-      user_id: input.userId,
-      branch_id: input.branchId ?? asString(book.branch_id),
-      device_id: input.deviceId ?? null,
-      borrowed_at: borrowedAt.toISOString(),
-      due_at: dueAt.toISOString(),
-      returned_at: null,
-      renew_count: 0,
-      status: "active",
-      idempotency_key: input.idempotencyKey
+    // The book status and the loan row change together: a failed insert leaves the book on the shelf.
+    const loan = this.repo.transaction(() => {
+      this.repo.update("books", input.bookId, { status: "borrowed" });
+      return this.repo.insert("loans", {
+        id: randomUUID(),
+        book_id: input.bookId,
+        user_id: input.userId,
+        branch_id: input.branchId ?? asString(book.branch_id),
+        device_id: input.deviceId ?? null,
+        borrowed_at: borrowedAt.toISOString(),
+        due_at: dueAt.toISOString(),
+        returned_at: null,
+        renew_count: 0,
+        status: "active",
+        idempotency_key: input.idempotencyKey
+      });
     });
     this.bus?.publishNoWait("circulation.borrowed", {
       loanId: String((loan as { id: string }).id), bookId: input.bookId, userId: input.userId,
@@ -72,9 +78,12 @@ export class CirculationService {
     const book = this.repo.findBook(asString(loan.book_id));
     if (!book) throw new DomainError("BOOK_NOT_FOUND", "Book not found");
     assertBookTransition(book.status as BookStatus, "on_shelf");
-    this.repo.update("books", asString(loan.book_id), { status: "on_shelf" });
     const returnedAt = new Date().toISOString();
-    const result = this.repo.update("loans", input.loanId, { status: "returned", returned_at: returnedAt });
+    // Shelving the book and closing the loan commit together, or neither does.
+    const result = this.repo.transaction(() => {
+      this.repo.update("books", asString(loan.book_id), { status: "on_shelf" });
+      return this.repo.update("loans", input.loanId, { status: "returned", returned_at: returnedAt });
+    });
     this.bus?.publishNoWait("circulation.returned", {
       loanId: input.loanId, bookId: asString(loan.book_id), userId: asString(loan.user_id),
       branchId: asString(loan.branch_id), deviceId: loan.device_id as string | null,
