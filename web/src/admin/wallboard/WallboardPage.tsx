@@ -50,9 +50,9 @@ async function fetchEnvironment(branchId: string): Promise<EnvState> {
   if (branchId === "all") return env;
   const from = new Date(Date.now() - 60 * 60 * 1000).toISOString();
   await Promise.all(ENV_METRICS.map(async (metric) => {
-    const params = new URLSearchParams({ branchId, metric, from });
-    const { data } = await api<{ data: Array<{ device_id: string; value: number; quality?: string }> }>(`/api/telemetry?${params.toString()}`).catch(() => ({ data: [] }));
-    for (const row of data) {
+    const params = new URLSearchParams({ branchId, metric, from, aggregate: "raw" });
+    const { data } = await api<{ data: { series: Array<{ device_id: string; value: number; quality?: string }> } }>(`/api/telemetry?${params.toString()}`).catch(() => ({ data: { series: [] } }));
+    for (const row of data.series) {
       if (row.quality === "dirty") continue;
       env[metric].byDevice[row.device_id] = row.value;
       const value = aggregate(metric, env[metric].byDevice);

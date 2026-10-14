@@ -7,6 +7,7 @@ import {
   type AlertFull, type DeviceRow, type MaintenanceKind, type MaintenanceRow
 } from "./adminApi";
 import { useAdmin } from "./adminContext";
+import { alertMessage, deviceLabel, maintenanceTitle } from "./alertText";
 import { errorText, ListView, PageHeading, usePagedList } from "./adminUi";
 import "./ops.css";
 
@@ -34,12 +35,15 @@ export function MaintenancePage() {
     void fetchDeviceIndex("all").then(setDevices).catch(() => setDevices(new Map()));
   }, []);
 
-  const deviceName = (id?: string | null) => (id ? devices.get(id)?.name ?? id : "—");
+  const deviceName = (id?: string | null) => {
+    const device = id ? devices.get(id) : undefined;
+    return device ? <span title={device.name}>{deviceLabel(t, device)}</span> : id ?? "—";
+  };
 
   const columns: Column<MaintenanceRow>[] = [
     { key: "started_at", header: t("admin.maintenance.started"), mono: true, render: (row) => stamp(row.started_at) },
     { key: "kind", header: t("admin.maintenance.kind"), render: (row) => <span className={`admin-kind is-${row.kind}`}>{t(`admin.maintenance.kinds.${row.kind}`)}</span> },
-    { key: "description", header: t("admin.maintenance.description"), render: (row) => <span className="admin-clamp">{row.description}</span> },
+    { key: "description", header: t("admin.maintenance.description"), render: (row) => <span className="admin-clamp" title={row.description}>{maintenanceTitle(t, row.description)}</span> },
     { key: "branch", header: t("admin.branch"), render: (row) => branchName(row.branch_id) },
     { key: "device", header: t("admin.alertsPage.device"), render: (row) => deviceName(row.device_id) },
     { key: "alert", header: t("admin.maintenance.alert"), mono: true, render: (row) => row.related_alert_id ?? "—" },
@@ -65,7 +69,7 @@ export function MaintenancePage() {
       <Drawer open={open} onClose={() => setOpen(false)} title={selected ? t(`admin.maintenance.kinds.${selected.kind}`) : ""}>
         {selected ? (
           <div className="admin-detail">
-            <p className="admin-detail-text">{selected.description}</p>
+            <p className="admin-detail-text" title={selected.description}>{maintenanceTitle(t, selected.description)}</p>
             <dl className="admin-detail-extra admin-dl">
               <dt>{t("admin.branch")}</dt><dd>{branchName(selected.branch_id)}</dd>
               <dt>{t("admin.alertsPage.device")}</dt><dd>{deviceName(selected.device_id)}</dd>
@@ -168,14 +172,14 @@ function MaintenanceForm({ devices, onCreated }: { devices: Map<string, DeviceRo
       <label htmlFor="m-device">{t("admin.alertsPage.device")}</label>
       <select id="m-device" value={device} disabled={!branch} onChange={(event) => setDevice(event.target.value)}>
         <option value="">{t("admin.maintenance.none")}</option>
-        {branchDevices.map((item) => <option key={item.id} value={item.id}>{item.name} · {t(`admin.deviceStatus.${item.status}`)}</option>)}
+        {branchDevices.map((item) => <option key={item.id} value={item.id} title={item.name}>{deviceLabel(t, item)} · {t(`admin.deviceStatus.${item.status}`)}</option>)}
         {device && !branchDevices.some((item) => item.id === device) ? <option value={device}>{device}</option> : null}
       </select>
 
       <label htmlFor="m-alert">{t("admin.maintenance.alert")}</label>
       <select id="m-alert" value={alert} disabled={!branch} onChange={(event) => setAlert(event.target.value)}>
         <option value="">{t("admin.maintenance.none")}</option>
-        {alerts.map((item) => <option key={item.id} value={item.id}>[{t(`admin.severity.${item.severity}`)}] {item.message.slice(0, 40)}</option>)}
+        {alerts.map((item) => <option key={item.id} value={item.id} title={item.message}>[{t(`admin.severity.${item.severity}`)}] {alertMessage(t, item, branchName(item.branch_id)).slice(0, 40)}</option>)}
         {alert && !alerts.some((item) => item.id === alert) ? <option value={alert}>{alert}</option> : null}
       </select>
 

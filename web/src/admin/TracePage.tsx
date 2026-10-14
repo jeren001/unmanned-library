@@ -5,6 +5,7 @@ import { Button, EmptyState, Skeleton, StatusBadge } from "../shared/components"
 import { StaggerList } from "../shared/motion";
 import type { BookRow } from "./adminApi";
 import { useAdmin } from "./adminContext";
+import { alertMessage, deviceLabel, maintenanceTitle } from "./alertText";
 import { ClipPlayer } from "./AlertsPage";
 import { BookBadge, LoanBadge } from "./ListPages";
 import { ErrorPanel, PageHeading } from "./adminUi";
@@ -197,7 +198,7 @@ function Chain({ chain, busy, onLoan }: { chain: TraceChain; busy: boolean; onLo
               </dl>
             </Step>
 
-            <Step index={4} label={t("admin.trace.step.device")} code={device?.id ?? loan.device_id ?? undefined} title={device ? device.name : t("admin.trace.deviceUnknown")}>
+            <Step index={4} label={t("admin.trace.step.device")} code={device?.id ?? loan.device_id ?? undefined} title={device ? <span title={device.name}>{deviceLabel(t, device)}</span> : t("admin.trace.deviceUnknown")}>
               {device ? (
                 <p className="admin-trace-text">
                   {t(`admin.deviceKind.${device.kind}`, { defaultValue: device.kind })} · {branchName(device.branch_id)} · <span className="mono">{device.protocol}://{device.address}</span>
@@ -215,7 +216,7 @@ function Chain({ chain, busy, onLoan }: { chain: TraceChain; busy: boolean; onLo
                   {clips.map((clip) => (
                     <li key={clip.id}>
                       <span>
-                        <b>{clip.device_name ?? clip.device_id ?? "—"}</b>
+                        <b title={clip.device_name ?? undefined}>{clip.device_name ? deviceLabel(t, { name: clip.device_name }) : clip.device_id ?? "—"}</b>
                         <small className="mono">{clip.id} · {stamp(clip.start_ts)} – {stamp(clip.end_ts).slice(11)}{clip.file_path ? ` · ${clip.file_path}` : ""}</small>
                       </span>
                     </li>
@@ -232,7 +233,7 @@ function Chain({ chain, busy, onLoan }: { chain: TraceChain; busy: boolean; onLo
                     <li key={alert.id}>
                       <StatusBadge tone={alert.severity === "critical" ? "danger" : alert.severity === "warning" ? "warn" : "info"} label={t(`admin.severity.${alert.severity}`)} />
                       <span>
-                        <b>{alert.message}</b>
+                        <b title={alert.message}>{alertMessage(t, alert, branchName(alert.branch_id))}</b>
                         <small className="mono">{alert.id} · {stamp(alert.created_at)} · {t(`admin.alertStatus.${alert.status}`)} · {t(`admin.trace.link.${alert.link}`)}</small>
                       </span>
                     </li>
@@ -250,8 +251,8 @@ function Chain({ chain, busy, onLoan }: { chain: TraceChain; busy: boolean; onLo
                       <li key={item.id}>
                         <StatusBadge tone={item.finished_at ? "ok" : "warn"} label={t(item.finished_at ? "admin.trace.maintenanceDone" : "admin.trace.maintenanceOpen")} />
                         <span>
-                          <b>{item.description}</b>
-                          <small className="mono">{item.id} · {stamp(item.started_at)} · {item.device_name ?? item.device_id ?? "—"}{item.related_alert_id ? ` · ${item.related_alert_id}` : ""}</small>
+                          <b title={item.description}>{maintenanceTitle(t, item.description)}</b>
+                          <small className="mono">{item.id} · {stamp(item.started_at)} · {item.device_name ? deviceLabel(t, { name: item.device_name }) : item.device_id ?? "—"}{item.related_alert_id ? ` · ${item.related_alert_id}` : ""}</small>
                         </span>
                       </li>
                     ))}
@@ -278,7 +279,7 @@ function DeviceEvent({ event }: { event: TraceDeviceEvent }) {
       <time className="mono" dateTime={event.at}>{event.approximate ? "≈ " : ""}{stamp(event.at)}</time>
       <span>
         {t(`admin.trace.event.${event.kind}`)}
-        {event.detail ? <> · {event.detail}</> : null}
+        {event.detail ? <> · <span title={event.detail}>{event.kind === "maintenance" ? maintenanceTitle(t, event.detail) : deviceLabel(t, { name: event.detail })}</span></> : null}
         {event.deviceId ? <> · <span className="mono">{event.deviceId}</span></> : null}
       </span>
       {event.derived ? <small>{t("admin.trace.derived")}</small> : null}

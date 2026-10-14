@@ -467,6 +467,16 @@
   align-items: start;
 }
 
+/* Grid items default to min-width: auto; let both columns shrink to their track instead of pushing the layout. */
+.admin-maintenance > * {
+  min-width: 0;
+}
+
+/* A wide table scrolls inside its card rather than widening the page. */
+.admin-maintenance .admin-list {
+  overflow-x: auto;
+}
+
 .admin-form {
   position: relative;
   display: grid;
@@ -476,6 +486,18 @@
   border: 1px solid var(--line);
   border-radius: var(--radius-panel);
   background: var(--surface);
+}
+
+.admin-form > * {
+  min-width: 0;
+}
+
+.admin-form select,
+.admin-form input,
+.admin-form textarea {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .admin-form::before {
@@ -523,15 +545,17 @@
   margin: 4px 0 0;
 }
 
+/* Started / Finished sit side by side only when both fit a full date and time; otherwise they stack. */
 .admin-form-pair {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 8px;
 }
 
 .admin-form-pair > div {
   display: grid;
   gap: 6px;
+  min-width: 0;
 }
 
 .admin-form-pair input {
@@ -540,6 +564,8 @@
 }
 
 .admin-form .qa-button {
+  max-width: 100%;
+  min-width: 0;
   margin-top: 10px;
 }
 

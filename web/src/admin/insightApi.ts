@@ -127,15 +127,16 @@ async function pool<T, R>(items: T[], size: number, run: (item: T) => Promise<R>
 }
 
 /**
- * GET /api/telemetry returns at most 1000 rows, oldest first, so one query over a busy range
- * would only show its beginning. The range is split into windows queried in parallel.
+ * GET /api/telemetry answers `{ data: { series, anomalies, … } }` (docs/API.md); with aggregate=raw, `series` holds at
+ * most 1000 rows, oldest first, so one query over a busy range would only show its beginning. The range is split into
+ * windows queried in parallel.
  */
 export async function fetchTelemetryRaw(branchId: string, metric: string, from: number, to: number, windows: number) {
   const step = (to - from) / windows;
   const bounds = Array.from({ length: windows }, (_, index) => [from + index * step, index === windows - 1 ? to : from + (index + 1) * step] as const);
   const pages = await pool(bounds, 6, ([start, end]) => {
-    const params = new URLSearchParams({ branchId, metric, from: new Date(start).toISOString(), to: new Date(end).toISOString() });
-    return api<{ data: TelemetrySample[] }>(`/api/telemetry?${params.toString()}`).then((body) => body.data);
+    const params = new URLSearchParams({ branchId, metric, from: new Date(start).toISOString(), to: new Date(end).toISOString(), aggregate: "raw" });
+    return api<{ data: { series: TelemetrySample[] } }>(`/api/telemetry?${params.toString()}`).then((body) => body.data.series);
   });
   const seen = new Set<string>();
   const samples: TelemetrySample[] = [];

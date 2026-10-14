@@ -8,7 +8,7 @@ import {
   type AlertFull, type AlertStatus, type ClipRow, type DeviceRow, type MaintenanceRow
 } from "./adminApi";
 import { useAdmin, useAdminEvent } from "./adminContext";
-import { alertMessage, deviceLabel } from "./alertText";
+import { alertMessage, deviceLabel, maintenanceTitle } from "./alertText";
 import { ErrorPanel, errorText, formatDate, PageHeading, RelativeTime } from "./adminUi";
 import "./ops.css";
 
@@ -169,7 +169,7 @@ function AlertCard({ alert, fresh, device, branch, busy, onOpen, onAct }: {
           <b>{t(`admin.alertType.${alert.type}`, { defaultValue: alert.type })}</b>
           <RelativeTime value={alert.created_at} />
         </span>
-        <span className="admin-alert-message">{alertMessage(t, alert, branch)}</span>
+        <span className="admin-alert-message" title={alert.message}>{alertMessage(t, alert, branch)}</span>
         <span className="admin-alert-meta">{branch}{device ? ` · ${deviceLabel(t, device)}` : ""}{alert.related_clip_id ? ` · ${t("admin.alertsPage.hasClip")}` : ""}</span>
       </button>
       {alert.status !== "resolved" ? (
@@ -201,7 +201,10 @@ function AlertDetail({ alert, device, branch, busy, onAct }: { alert: AlertFull;
     id: `${event.kind}-${index}`,
     at: event.at,
     title: `${t(`admin.alertsPage.event.${event.kind}`)}${event.approximate ? ` (${t("admin.alertsPage.approx")})` : ""}`,
-    detail: event.detail,
+    // Seeded alert and work-order text is shown in the UI language; the raw value stays in a tooltip.
+    detail: event.detail && (event.kind === "raised" || event.kind === "maintenance")
+      ? <span title={event.detail}>{event.kind === "raised" ? alertMessage(t, { type: alert.type, message: event.detail }, branch) : maintenanceTitle(t, event.detail)}</span>
+      : event.detail,
     tone: event.kind === "resolved" ? "success" as const : event.kind === "raised" ? "danger" as const : "accent" as const
   }));
 
@@ -211,10 +214,10 @@ function AlertDetail({ alert, device, branch, busy, onAct }: { alert: AlertFull;
     <div className="admin-detail">
       <div className={`admin-alert-summary is-${alert.severity}`}>
         <StatusBadge tone={SEVERITY_TONE[alert.severity]} label={t(`admin.severity.${alert.severity}`)} />
-        <p>{alertMessage(t, alert, branch)}</p>
+        <p title={alert.message}>{alertMessage(t, alert, branch)}</p>
         <dl className="admin-detail-extra">
           <dt>{t("admin.branch")}</dt><dd>{branch}</dd>
-          <dt>{t("admin.alertsPage.device")}</dt><dd>{device ? deviceLabel(t, device) : alert.device_id ?? "—"}</dd>
+          <dt>{t("admin.alertsPage.device")}</dt><dd title={device?.name}>{device ? deviceLabel(t, device) : alert.device_id ?? "—"}</dd>
           <dt>{t("admin.alertsPage.raised")}</dt><dd className="mono">{alert.created_at.replace("T", " ").slice(0, 16)}</dd>
           <dt>{t("catalog.status")}</dt><dd>{t(`admin.alertStatus.${alert.status}`)}</dd>
           <dt>ID</dt><dd className="mono">{alert.id}</dd>

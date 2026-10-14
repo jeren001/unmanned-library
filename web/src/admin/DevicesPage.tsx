@@ -4,6 +4,7 @@ import { Button, CatalogCard, Drawer, EmptyState, Skeleton, StatusBadge } from "
 import { animate, StaggerList } from "../shared/motion";
 import { DEVICE_COMMANDS, listPage, testDevice, updateDevice, type DeviceRow, type DeviceStatus, type DeviceTestResult } from "./adminApi";
 import { useAdmin, useAdminEvent } from "./adminContext";
+import { deviceLabel } from "./alertText";
 import { ErrorPanel, errorText, FilterChips, PageHeading, Pager, RelativeTime, SearchBox, useDebounced, usePagedList } from "./adminUi";
 import "./ops.css";
 
@@ -83,7 +84,7 @@ export function DevicesPage() {
         </>
       )}
 
-      <Drawer open={open} onClose={() => setOpen(false)} title={selected?.name ?? ""}>
+      <Drawer open={open} onClose={() => setOpen(false)} title={selected ? <span title={selected.name}>{deviceLabel(t, selected)}</span> : ""}>
         {selected ? <DeviceDetail key={selected.id} device={selected} branch={branchName(selected.branch_id)} onSaved={(device) => setEdited((value) => ({ ...value, [device.id]: device }))} /> : null}
       </Drawer>
     </>
@@ -102,13 +103,13 @@ function DeviceCard({ device, branch, changedAt, selected, onOpen }: { device: D
   }, [changedAt]);
 
   return (
-    <button ref={ref} type="button" className={`admin-device-card is-${device.status} ${selected ? "is-selected" : ""}`} onClick={onOpen} aria-label={`${device.name} · ${t(`admin.deviceStatus.${device.status}`)}`}>
+    <button ref={ref} type="button" className={`admin-device-card is-${device.status} ${selected ? "is-selected" : ""}`} onClick={onOpen} aria-label={`${deviceLabel(t, device)} · ${t(`admin.deviceStatus.${device.status}`)}`} title={device.name}>
       <span className="admin-device-spine" aria-hidden="true" />
       <span className="admin-device-head">
         <code>{t(`admin.deviceKind.${device.kind}`, { defaultValue: device.kind })}</code>
         <DeviceBadge status={device.status} />
       </span>
-      <b>{device.name}</b>
+      <b>{deviceLabel(t, device)}</b>
       <span className="admin-device-meta">{branch} · {device.vendor}</span>
       <span className="admin-device-foot">
         <span className="mono">{device.protocol}://{device.address}</span>
@@ -179,7 +180,7 @@ function DeviceDetail({ device, branch, onSaved }: { device: DeviceRow; branch: 
 
   return (
     <div className="admin-detail">
-      <CatalogCard callNumber={device.id} callNumberLabel="ID" title={device.name} author={device.vendor} location={branch}>
+      <CatalogCard callNumber={device.id} callNumberLabel="ID" title={deviceLabel(t, device)} author={device.vendor} location={branch}>
         <dl className="admin-detail-extra">
           <dt>{t("admin.devices.kind")}</dt><dd>{t(`admin.deviceKind.${device.kind}`, { defaultValue: device.kind })}</dd>
           <dt>{t("admin.devices.address")}</dt><dd className="mono">{device.protocol}://{device.address}</dd>

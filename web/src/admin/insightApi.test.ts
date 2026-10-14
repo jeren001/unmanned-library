@@ -59,7 +59,8 @@ describe("telemetry", () => {
       const rows = start === Date.parse("2026-10-08T00:00:00Z")
         ? Array.from({ length: 1000 }, (_, index) => sample(new Date(start + index * 1000).toISOString(), 21))
         : [sample(new Date(start + 60_000).toISOString(), 23)];
-      return json(200, { data: rows });
+      // Same shape as the server: the samples sit in data.series.
+      return json(200, { data: { branchId: "branch-east", metric: "temperature", aggregate: "raw", mode: "raw", series: rows, anomalies: [] } });
     }));
     const series = await fetchTelemetrySeries("branch-east", "temperature", "24h", Date.parse("2026-10-09T00:00:00Z"));
     expect(calls.filter((url) => url.startsWith("/api/telemetry?"))).toHaveLength(24);
