@@ -1,10 +1,11 @@
+import { useTranslation } from "react-i18next";
 import type { BookStatus } from "../shared/components";
-import { formatDate as formatLocalDate } from "../shared/i18n";
+import { formatDate as formatLocalDate, formatNumber } from "../shared/i18n";
 import { AlertIcon } from "../shared/icons";
 import type { Book, Loan } from "./kioskState";
 import "./kiosk-ui.css";
 
-/* Small helpers shared by the restyled kiosk flows. Strings stay bilingual like the rest of the kiosk. */
+/* Small helpers shared by the restyled kiosk flows. Text comes from the locale files, one language at a time. */
 
 const DAY_MS = 86400000;
 
@@ -14,7 +15,8 @@ export function formatDate(value: string | Date) {
 }
 
 export function callNumberOf(book: Book) {
-  return book.call_number ? { value: book.call_number, label: "索书号 / Call no." } : { value: book.isbn, label: "ISBN" };
+  // Without an explicit label the catalogue card shows its translated "call no." label.
+  return book.call_number ? { value: book.call_number, label: undefined } : { value: book.isbn, label: "ISBN" };
 }
 
 export function bookStatusOf(book: Book): BookStatus {
@@ -31,7 +33,16 @@ export function overdueDays(loan: Loan, now = Date.now()) {
 }
 
 export function formatFine(cents: number) {
-  return `¥${(cents / 100).toFixed(2)}`;
+  return formatNumber(cents / 100, { style: "currency", currency: "CNY" });
+}
+
+/**
+ * Kiosk messages (errors, result titles) are kept as i18n keys in state and translated on render,
+ * so they follow a later language switch. Anything else (e.g. dev-drawer text) is shown as is.
+ */
+export function useKioskText() {
+  const { t } = useTranslation();
+  return (text: string, values?: Record<string, string | number>) => (text.startsWith("kiosk.") ? t(text, values) : text);
 }
 
 /** Error slip in the catalogue-card language: rose spine, serif heading, message. */

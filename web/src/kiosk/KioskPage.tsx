@@ -14,7 +14,7 @@ import {
 import { BorrowFlow, BorrowReceipt } from "./BorrowFlow";
 import { LoansFlow, RenewFlow, ReserveFlow, ReturnFlow, ReturnResult } from "./LoanFlows";
 import { KioskHome } from "./KioskHome";
-import { overdueDays } from "./kioskUi";
+import { overdueDays, useKioskText } from "./kioskUi";
 import "./kiosk.css";
 
 function bilingual(zh: string, en: string) {
@@ -25,15 +25,23 @@ function formatDate(value?: string) {
   return value ? formatLocalDate(value) : "--";
 }
 
+const ERROR_KEYS: Record<string, string> = {
+  INVALID_CARD: "kiosk.error.invalidCard",
+  ACCOUNT_LOCKED: "kiosk.error.accountLocked",
+  BOOK_UNAVAILABLE: "kiosk.error.bookUnavailable",
+  ILLEGAL_BOOK_STATE: "kiosk.error.bookUnavailable",
+  BOOK_NOT_FOUND: "kiosk.error.bookNotFound",
+  MAX_LOANS_REACHED: "kiosk.error.maxLoans",
+  MAX_RENEWALS_REACHED: "kiosk.error.maxRenewals",
+  LOAN_RESERVED: "kiosk.error.loanReserved",
+  LOAN_NOT_ACTIVE: "kiosk.error.loanNotActive",
+  LOAN_NOT_FOUND: "kiosk.error.loanNotActive"
+};
+
+/** i18n key for a failed kiosk action; unknown server errors get a generic message in the UI language. */
 function errorMessage(error: unknown) {
   const code = (error as Error & { code?: string })?.code;
-  if (code === "INVALID_CARD") return "读者证未识别，请重试 / Reader card not recognized.";
-  if (code === "ACCOUNT_LOCKED") return "账号暂时锁定，请联系馆员 / Account locked. Please call support.";
-  if (code === "BOOK_UNAVAILABLE") return "这本书刚刚被借走了 / This book is no longer available.";
-  if (code === "MAX_LOANS_REACHED") return "已达到借阅上限 / Your loan limit has been reached.";
-  if (code === "MAX_RENEWALS_REACHED") return "这本书已达到续借次数上限 / Renewal limit reached.";
-  if (code === "LOAN_RESERVED") return "这本书已被其他读者预约，暂时不能续借 / This book is reserved by another reader.";
-  return error instanceof Error ? error.message : "操作未完成，请稍后再试 / Please try again.";
+  return (code && ERROR_KEYS[code]) || "kiosk.error.generic";
 }
 
 export function KioskPage() {
@@ -51,7 +59,7 @@ export function KioskPage() {
   const [searchResults, setSearchResults] = useState<Book[]>([]);
   const [busy, setBusy] = useState(false);
   const [warningSeconds, setWarningSeconds] = useState<number | null>(null);
-  const [reconcileMessage, setReconcileMessage] = useState("");
+  const [reconcileMessage, setReconcileMessage] = useState<{ key: string; values?: Record<string, string | number> } | null>(null);
   const [policy, setPolicy] = useState({ loanDays: 30, maxLoans: 8, maxRenewals: 2, finePerDayCents: 50 });
   const [support, setSupport] = useState<SupportStatus>("idle");
   const navigate = useNavigate();
@@ -145,10 +153,10 @@ export function KioskPage() {
   useEffect(() => {
     const online = () => {
       dispatch({ type: "SET_NETWORK", network: "syncing" });
-      void syncOutbox((message) => setReconcileMessage(`同步冲突 / Reconciliation: ${message}`))
+      void syncOutbox((message) => setReconcileMessage({ key: "kiosk.sync.conflict", values: { message } }))
         .then(async (result) => {
           await refreshOutbox();
-          if (result.synced) setReconcileMessage(`已同步 ${result.synced} 笔操作 / Synced ${result.synced} operations`);
+          if (result.synced) setReconcileMessage({ key: "kiosk.sync.synced", values: { n: formatNumber(result.synced) } });
         })
         .finally(() => dispatch({ type: "SET_NETWORK", network: "online" }));
     };
@@ -177,7 +185,7 @@ export function KioskPage() {
   async function identify() {
     dispatch({ type: "CLEAR_ERROR" });
     if (!card.trim()) {
-      dispatch({ type: "INPUT_ERROR", message: "请输入读者证号 / Enter your card number." });
+      dispatch({ type: "INPUT_ERROR", message: "kiosk.error.cardRequired" });
       identifyRef.current?.focus();
       return;
     }
@@ -217,7 +225,7 @@ export function KioskPage() {
     // An unknown tag must not silently pick an arbitrary cached book; only trust a real search hit.
     const book = candidates.find((item) => [item.id, item.isbn, item.rfid_tag].includes(trimmed)) ?? (searched ? books[0] : undefined);
     if (!book) {
-      dispatch({ type: "INPUT_ERROR", message: "没有找到这本书 / Book not found." });
+      dispatch({ type: "INPUT_ERROR", message: "kiosk.error.bookNotFound" });
       return;
     }
     dispatch({ type: "SET_BOOKS", books: candidates });
@@ -239,8 +247,8 @@ export function KioskPage() {
       await refreshOutbox();
       dispatch({ type: "RESULT", result: {
         kind: offline ? "offline" : "success",
-        title: offline ? "已保存，网络恢复后自动提交 / Saved for sync" : "借阅成功 / Borrowed",
-        detail: "请取走图书，闸机已授权 / Please take your books. Gate authorized.",
+        title: offline ? "kiosk.result.borrowSaved" : "kiosk.result.borrowed",
+        detail: "kiosk.result.borrowDetail",
         items,
         queuedCount: state.outboxCount + items.filter((item) => offline && item.dueAt).length
       } });
@@ -260,9 +268,10 @@ export function KioskPage() {
       await refreshOutbox();
       dispatch({ type: "RESULT", result: {
         kind: result.online ? "success" : "offline",
-        title: result.online ? "归还成功 / Returned" : "归还已保存 / Return saved",
-        detail: `请放回 ${loan.book?.shelf_location ?? "对应书架"} / Please return it to the shelf.`,
-        items: [{ title: loan.book?.title ?? "Book", shelf: loan.book?.shelf_location, overdueDays: late, fineCents: late * policy.finePerDayCents }]
+        title: result.online ? "kiosk.result.returned" : "kiosk.result.returnSaved",
+        detail: loan.book?.shelf_location ? "kiosk.result.returnDetail" : "kiosk.result.returnDetailNoShelf",
+        values: { shelf: loan.book?.shelf_location ?? "" },
+        items: [{ title: loan.book?.title ?? loan.book_id, shelf: loan.book?.shelf_location, overdueDays: late, fineCents: late * policy.finePerDayCents }]
       } });
     } catch (error) {
       dispatch({ type: "ERROR", message: errorMessage(error) });
@@ -274,7 +283,7 @@ export function KioskPage() {
   async function performRenew() {
     const selected = state.loans.filter((loan) => state.selectedLoanIds.includes(loan.id));
     if (!selected.length) {
-      dispatch({ type: "INPUT_ERROR", message: "请先选择图书 / Select at least one book." });
+      dispatch({ type: "INPUT_ERROR", message: "kiosk.error.selectBook" });
       return;
     }
     setBusy(true);
@@ -282,13 +291,13 @@ export function KioskPage() {
       let offline = false;
       const items: KioskResult["items"] = [];
       for (const loan of selected) {
-        if (loan.renew_count >= policy.maxRenewals) throw new Error(`《${loan.book?.title ?? "这本书"}》已达到续借上限 / Renewal limit reached.`);
+        if (loan.renew_count >= policy.maxRenewals) throw Object.assign(new Error("MAX_RENEWALS_REACHED"), { code: "MAX_RENEWALS_REACHED" });
         const result = await renewLoan({ loan, online: state.network === "online" });
         offline ||= !result.online;
-        items.push({ title: loan.book?.title ?? "Book", dueAt: result.online ? result.data.due_at : new Date(Date.now() + policy.loanDays * 86400000).toISOString() });
+        items.push({ title: loan.book?.title ?? loan.book_id, dueAt: result.online ? result.data.due_at : new Date(Date.now() + policy.loanDays * 86400000).toISOString() });
       }
       await refreshOutbox();
-      dispatch({ type: "RESULT", result: { kind: offline ? "offline" : "success", title: offline ? "续借已保存 / Renewal saved" : "续借成功 / Renewed", detail: "新的到期日如下 / New due dates are below.", items } });
+      dispatch({ type: "RESULT", result: { kind: offline ? "offline" : "success", title: offline ? "kiosk.result.renewSaved" : "kiosk.result.renewed", detail: "kiosk.result.renewDetail", items } });
     } catch (error) {
       dispatch({ type: "ERROR", message: errorMessage(error) });
     } finally {
@@ -302,7 +311,7 @@ export function KioskPage() {
     try {
       const result = await reserveBook({ book, userId: state.user.id, online: state.network === "online" });
       await refreshOutbox();
-      dispatch({ type: "RESULT", result: { kind: result.online ? "success" : "offline", title: result.online ? "预约成功 / Reserved" : "预约已保存 / Reservation saved", detail: `我们会为您保留《${book.title}》 / We will hold this book for you.` } });
+      dispatch({ type: "RESULT", result: { kind: result.online ? "success" : "offline", title: result.online ? "kiosk.result.reserved" : "kiosk.result.reserveSaved", detail: "kiosk.result.reserveDetail", values: { title: book.title } } });
     } catch (error) {
       dispatch({ type: "ERROR", message: errorMessage(error) });
     } finally {
@@ -396,10 +405,10 @@ export function KioskPage() {
       {state.network !== "online" || state.outboxCount > 0 ? (
         <div className="kiosk-offline-banner" role="status">
           <OfflineIcon />
-          <span>{state.network === "syncing" ? "正在同步 / Syncing" : "离线模式 / Offline mode"} · 已保存 {state.outboxCount} 笔操作 / {state.outboxCount} saved</span>
+          <span>{t(state.network === "syncing" ? "kiosk.sync.syncing" : "kiosk.sync.offline")} · {t("kiosk.sync.saved", { n: formatNumber(state.outboxCount) })}</span>
         </div>
       ) : null}
-      {reconcileMessage ? <div className="kiosk-reconcile" role="alert"><AlertIcon />{reconcileMessage}<button onClick={() => setReconcileMessage("")}><CloseIcon /></button></div> : null}
+      {reconcileMessage ? <div className="kiosk-reconcile" role="alert"><AlertIcon />{t(reconcileMessage.key, reconcileMessage.values)}<button onClick={() => setReconcileMessage(null)}><CloseIcon /></button></div> : null}
 
       {state.screen === "idle" ? (
         idleScreen
@@ -414,7 +423,7 @@ export function KioskPage() {
           const book = state.books.find((item) => [item.id, item.isbn, item.rfid_tag].includes(returnInput.trim()));
           const loan = activeLoans.find((item) => item.book_id === book?.id);
           if (loan) void performReturn(loan);
-          else dispatch({ type: "INPUT_ERROR", message: "未找到您的在借图书 / No matching active loan found." });
+          else dispatch({ type: "INPUT_ERROR", message: "kiosk.error.noMatchingLoan" });
           setReturnInput("");
         }} input={returnInput} setInput={setReturnInput} onBack={back} busy={busy} error={state.error || state.inputError} />
       ) : state.screen === "renew" && state.user ? (
@@ -447,10 +456,10 @@ export function KioskPage() {
       }} onOffline={() => {
         if (state.network === "offline") {
           dispatch({ type: "SET_NETWORK", network: "syncing" });
-          void syncOutbox((message) => setReconcileMessage(`同步冲突 / Reconciliation: ${message}`))
+          void syncOutbox((message) => setReconcileMessage({ key: "kiosk.sync.conflict", values: { message } }))
             .then(async (result) => {
               await refreshOutbox();
-              if (result.synced) setReconcileMessage(`已同步 ${result.synced} 笔操作 / Synced ${result.synced} operations`);
+              if (result.synced) setReconcileMessage({ key: "kiosk.sync.synced", values: { n: formatNumber(result.synced) } });
             })
             .finally(() => dispatch({ type: "SET_NETWORK", network: "online" }));
         } else dispatch({ type: "SET_NETWORK", network: "offline" });
@@ -481,13 +490,14 @@ function IdleScreen({ time, occupancy, capacity, onStart, scanRef, onScan }: { t
 }
 
 function IdentifyScreen({ card, pin, setCard, setPin, onSubmit, error, inputRef, loading }: { card: string; pin: string; setCard: (value: string) => void; setPin: (value: string) => void; onSubmit: () => void; error: string; inputRef: RefObject<HTMLInputElement | null>; loading: boolean }) {
+  const text = useKioskText();
   return <KioskShell title="identify" onBack={undefined}>
     <div className="kiosk-identify">
       <div className="kiosk-scan-mark">◎</div>
       <h2>刷卡或输入证号<small>Tap your card or enter card number</small></h2>
       <input ref={inputRef} className="kiosk-scan-input" autoFocus value={card} onChange={(event) => setCard(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") onSubmit(); }} placeholder="20240001" aria-label="Reader card number" />
       <label className="kiosk-pin-field"><span>PIN（可选） / Optional PIN</span><input inputMode="numeric" value={pin} onChange={(event) => setPin(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") onSubmit(); }} placeholder="••••" /></label>
-      {error ? <p className="kiosk-error" role="alert"><AlertIcon />{error}</p> : null}
+      {error ? <p className="kiosk-error" role="alert"><AlertIcon />{text(error)}</p> : null}
       <Button loading={loading} onClick={onSubmit}>{bilingual("继续", "Continue")}</Button>
       <p className="kiosk-hint">支持读者证、二维码和键盘扫码器<br /><small>Cards, QR codes, and keyboard barcode scanners supported</small></p>
     </div>
@@ -586,7 +596,9 @@ function KioskNav({ onBack, onHome }: { onBack: () => void; onHome?: () => void 
 }
 
 function ResultScreen({ result, onDone }: { result: KioskResult; onDone: () => void }) {
-  return <section className="kiosk-result"><div className={`kiosk-result-mark ${result.kind}`}><CheckIcon /></div><h1>{result.title}</h1><p>{result.detail}</p>{result.items?.length ? <div className="kiosk-result-items">{result.items.map((item) => <div key={item.title}><strong>{item.title}</strong><span>{item.dueAt ? `应还 ${formatDate(item.dueAt)}` : item.shelf ?? ""}</span></div>)}</div> : null}<button className="kiosk-start" onClick={onDone}>{bilingual("返回首页", "Back to home")}<span>→</span></button></section>;
+  const { t } = useTranslation();
+  const text = useKioskText();
+  return <section className="kiosk-result"><div className={`kiosk-result-mark ${result.kind}`}><CheckIcon /></div><h1>{text(result.title, result.values)}</h1><p>{text(result.detail, result.values)}</p>{result.items?.length ? <div className="kiosk-result-items">{result.items.map((item) => <div key={item.title}><strong>{item.title}</strong><span>{item.dueAt ? t("kiosk.flow.dueOn", { date: formatDate(item.dueAt) }) : item.shelf ?? ""}</span></div>)}</div> : null}<button className="kiosk-start" onClick={onDone}><span>{t("kiosk.flow.backHome")}</span><span>→</span></button></section>;
 }
 
 

@@ -43,8 +43,10 @@ export type Loan = {
 
 export type KioskResult = {
   kind: "success" | "offline" | "warning";
+  /** i18n keys (see useKioskText), interpolated with `values`. */
   title: string;
   detail: string;
+  values?: Record<string, string | number>;
   items?: Array<{ title: string; dueAt?: string; shelf?: string; overdueDays?: number; fineCents?: number }>;
   queuedCount?: number;
 };

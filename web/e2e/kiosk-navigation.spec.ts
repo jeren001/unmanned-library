@@ -49,10 +49,10 @@ async function signIn(page: Page) {
 }
 
 async function placeBookAndReview(page: Page) {
-  await page.getByPlaceholder("RFID-000001 / ISBN").fill(BOOK_TAG);
-  await page.getByRole("button", { name: /添加.*Add/ }).click();
+  await page.getByPlaceholder(/^RFID-000001 (或|or) ISBN$/).fill(BOOK_TAG);
+  await page.getByRole("button", { name: /^(添加|Add)$/ }).click();
   await expect(page.locator(".kiosk-book-card").first()).toBeVisible();
-  await page.getByRole("button", { name: /确认借阅.*Review/ }).click();
+  await page.getByRole("button", { name: /^(确认借阅|Review)$/ }).click();
   await expect(page.getByText(/请确认以下借阅/)).toBeVisible();
 }
 
@@ -131,17 +131,17 @@ test("reader screens: every flow, help and Back/Home keep a screen and the sessi
   await expect(page.getByText(/请将图书平放在感应区/)).toBeVisible();
   await expect(page.locator(".kiosk-book-card").first()).toBeVisible();
   await expectScreen(page, "borrow step 2 → Back", { back: true, home: true });
-  await page.getByRole("button", { name: /确认借阅.*Review/ }).click();
-  await page.getByRole("button", { name: /取消.*Cancel/ }).click();
+  await page.getByRole("button", { name: /^(确认借阅|Review)$/ }).click();
+  await page.getByRole("button", { name: /^(取消|Cancel)$/ }).click();
   await expectScreen(page, "borrow step 2 → Cancel", { back: false, home: false });
 
   await open(page, "borrow");
-  await page.getByRole("button", { name: /取消.*Cancel/ }).click();
+  await page.getByRole("button", { name: /^(取消|Cancel)$/ }).click();
   await expectScreen(page, "borrow step 1 → Cancel", { back: false, home: false });
 
   await open(page, "borrow");
   await placeBookAndReview(page);
-  await page.getByRole("button", { name: /借阅并开闸.*Borrow & exit/ }).click();
+  await page.getByRole("button", { name: /^(借阅并开闸|Borrow & exit)$/ }).click();
   await expect(page.getByText(/借阅成功|Borrowed|已保存/).first()).toBeVisible();
   await expectScreen(page, "borrow step 3 (receipt)", { back: true, home: true });
   await helpButton(page).click();
@@ -153,7 +153,7 @@ test("reader screens: every flow, help and Back/Home keep a screen and the sessi
 
   // Return the book just borrowed, covering the return result screen.
   await open(page, "return");
-  await page.locator(".kiosk-shell").getByRole("button", { name: /归还.*Return/ }).last().click();
+  await page.locator(".kiosk-shell").getByRole("button", { name: /^(归还|Return)$/ }).last().click();
   await expect(page.getByText(/归还成功|Returned|归还已保存/).first()).toBeVisible();
   await expectScreen(page, "return result", { back: true, home: true });
   await back(page).click();

@@ -70,10 +70,10 @@ test("my loans lists a new loan with a due badge and a counted total", async ({ 
   const before = Number((await page.locator("#kiosk-my-loans-title").innerText()).replace(/\D/g, "") || 0);
 
   await page.locator("[data-service=borrow]").click();
-  await page.getByPlaceholder("RFID-000001 / ISBN").fill(BOOK_TAG);
-  await page.getByRole("button", { name: /添加.*Add/ }).click();
-  await page.getByRole("button", { name: /确认借阅.*Review/ }).click();
-  await page.getByRole("button", { name: /借阅并开闸.*Borrow & exit/ }).click();
+  await page.getByPlaceholder(/^RFID-000001 (或|or) ISBN$/).fill(BOOK_TAG);
+  await page.getByRole("button", { name: /^(添加|Add)$/ }).click();
+  await page.getByRole("button", { name: /^(确认借阅|Review)$/ }).click();
+  await page.getByRole("button", { name: /^(借阅并开闸|Borrow & exit)$/ }).click();
   await expect(page.getByText(/借阅成功|Borrowed|已保存/).first()).toBeVisible();
   await page.locator(".kiosk-nav-home").click();
 
@@ -84,6 +84,6 @@ test("my loans lists a new loan with a due badge and a counted total", async ({ 
 
   // Put the book back so the seed stays reusable.
   await page.locator("[data-service=return]").click();
-  await page.locator(".kiosk-shell").getByRole("button", { name: /归还.*Return/ }).last().click();
+  await page.locator(".kiosk-shell").getByRole("button", { name: /^(归还|Return)$/ }).last().click();
   await expect(page.getByText(/归还成功|Returned|归还已保存/).first()).toBeVisible();
 });

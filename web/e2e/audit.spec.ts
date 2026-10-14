@@ -356,8 +356,8 @@ test("kiosk frame rate", async ({ browser }) => {
   });
   await measure("borrow", async () => { await page.locator("[data-service=borrow]").click(); });
   await measure("add-book", async () => {
-    await page.getByPlaceholder("RFID-000001 / ISBN").fill("RFID-000003");
-    await page.getByRole("button", { name: /添加.*Add/ }).click();
+    await page.getByPlaceholder(/^RFID-000001 (或|or) ISBN$/).fill("RFID-000003");
+    await page.getByRole("button", { name: /^(添加|Add)$/ }).click();
   });
   await measure("back-home", async () => { await page.locator(".kiosk-shell-heading .kiosk-back").click(); });
   report.kioskFrames = frames;
