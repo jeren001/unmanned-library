@@ -8,3 +8,9 @@ coverage/
 *.sqlite3
 .DS_Store
 server/data/*.sqlite*
+
+# Generated output
+*.sqlite*
+*.tsbuildinfo
+test-results/
+playwright-report/
