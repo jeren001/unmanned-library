@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cardLogin, cardLoginErrorMessage, cardScan, destinationFor, LoginError, loginErrorMessage, passwordLogin } from "./loginApi";
+import { cardLogin, cardLoginErrorMessage, cardScan, destinationFor, fetchServerDemoMode, LoginError, loginErrorMessage, passwordLogin } from "./loginApi";
 
 function mockFetch(status: number, body: unknown) {
   vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(body), { status })));
@@ -8,6 +8,18 @@ function mockFetch(status: number, body: unknown) {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("login api", () => {
+  it("shows the demo hints only when the server says it is in demo mode", async () => {
+    mockFetch(200, { demoMode: true });
+    await expect(fetchServerDemoMode()).resolves.toBe(true);
+    expect((fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0][0]).toBe("/api/auth/demo");
+    mockFetch(200, { demoMode: false });
+    await expect(fetchServerDemoMode()).resolves.toBe(false);
+    mockFetch(404, { error: "NOT_FOUND" });
+    await expect(fetchServerDemoMode()).resolves.toBe(false);
+    vi.stubGlobal("fetch", vi.fn(async () => { throw new TypeError("offline"); }));
+    await expect(fetchServerDemoMode()).resolves.toBe(false);
+  });
+
   it("returns the session user on success", async () => {
     mockFetch(200, { user: { id: "reader-001", role: "reader", name: "林知秋", account: "R-2048" } });
     await expect(cardLogin(" 20240001 ", "reader123")).resolves.toMatchObject({ name: "林知秋" });

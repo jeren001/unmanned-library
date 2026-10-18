@@ -100,3 +100,21 @@ describe("card scan", () => {
     expect(result.cookie).toBeNull();
   });
 });
+
+describe("demo flag for /login", () => {
+  async function demoFlag() {
+    const response = await fetch(`${base}/api/auth/demo`);
+    return { status: response.status, body: await response.json() as { demoMode?: boolean } };
+  }
+
+  it("is on in demo mode, so /login may show the demo accounts and PIN", async () => {
+    process.env.DEMO_MODE = "true";
+    expect(await demoFlag()).toEqual({ status: 200, body: { demoMode: true } });
+  });
+
+  it("is off outside demo mode, the same flag that disables /card-scan", async () => {
+    process.env.DEMO_MODE = "false";
+    expect(await demoFlag()).toEqual({ status: 200, body: { demoMode: false } });
+    expect((await post("card-scan", { cardNumber: "20240001" })).status).toBe(404);
+  });
+});

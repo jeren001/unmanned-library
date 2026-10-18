@@ -350,6 +350,11 @@ authRouter.post("/card-login", rateLimit, async (req, res) => {
   res.json({ user: publicUser(user) });
 });
 
+// Lets /login show the demo accounts and the demo PIN only when the server is in demo mode (same flag as /card-scan).
+authRouter.get("/demo", (_req, res) => {
+  res.json({ demoMode: isServerDemoMode() });
+});
+
 // Simulates the physical card reader: holding the card is the proof, so no PIN. Demo mode only.
 authRouter.post("/card-scan", (req, res, next) => {
   if (!isServerDemoMode()) {

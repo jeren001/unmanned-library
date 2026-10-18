@@ -6,7 +6,7 @@ import { AlertIcon } from "../shared/icons";
 import { DEMO_MODE } from "../shared/demoMode";
 import { DemoReaderPicker } from "../shared/DemoReaderPicker";
 import { BookSpinesBand, PageTurn, prefersReducedMotion } from "../shared/motion";
-import { cardLogin, cardLoginErrorMessage, cardScan, destinationFor, LoginError, loginErrorMessage, passwordLogin, type Role, type SessionUser } from "./loginApi";
+import { cardLogin, cardLoginErrorMessage, cardScan, destinationFor, fetchServerDemoMode, LoginError, loginErrorMessage, passwordLogin, type Role, type SessionUser } from "./loginApi";
 import "./login.css";
 
 type Theme = "light" | "dark";
@@ -22,6 +22,25 @@ const demoAccounts: Record<StaffRole, { account: string; password: string }> = {
   librarian: { account: "librarian", password: "librarian123" },
   admin: { account: "admin", password: "admin123" }
 };
+
+/**
+ * Demo accounts and the demo PIN are shown only when the build is a demo build (VITE_DEMO_MODE, so production
+ * bundles drop them) and the server is in demo mode too (DEMO_MODE, the same flag as /card-scan).
+ */
+function useDemoHints() {
+  const [serverDemo, setServerDemo] = useState(false);
+  useEffect(() => {
+    if (!DEMO_MODE) return;
+    let active = true;
+    void fetchServerDemoMode().then((value) => {
+      if (active) setServerDemo(value);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+  return DEMO_MODE && serverDemo;
+}
 
 const wait = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, prefersReducedMotion() ? 0 : ms));
 
@@ -109,6 +128,7 @@ function isTextEntry(target: EventTarget | null) {
 
 function ReaderLogin({ focusOnMount, onSuccess }: { focusOnMount: boolean; onSuccess: (user: SessionUser) => void }) {
   const { t } = useTranslation();
+  const demoHints = useDemoHints();
   const inputRef = useRef<HTMLInputElement>(null);
   const pinRef = useRef<HTMLInputElement>(null);
   const [cardNumber, setCardNumber] = useState("");
@@ -233,7 +253,7 @@ function ReaderLogin({ focusOnMount, onSuccess }: { focusOnMount: boolean; onSuc
             <TextField
               ref={pinRef}
               label={t("login.reader.pinLabel")}
-              hint={DEMO_MODE && error?.field !== "pin" ? t("login.reader.pinHint") : undefined}
+              hint={demoHints && error?.field !== "pin" ? t("login.reader.pinHint") : undefined}
               error={error?.field === "pin" ? t(error.key, error.values) : undefined}
               type="password"
               name="pin"
@@ -265,6 +285,7 @@ function ReaderLogin({ focusOnMount, onSuccess }: { focusOnMount: boolean; onSuc
 
 function StaffLogin({ role, onSuccess }: { role: StaffRole; onSuccess: (user: SessionUser) => void }) {
   const { t } = useTranslation();
+  const demoHints = useDemoHints();
   const [account, setAccount] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -344,7 +365,7 @@ function StaffLogin({ role, onSuccess }: { role: StaffRole; onSuccess: (user: Se
         <Button type="submit" loading={loading} disabled={isLocked}>{t("login.staff.submit")}</Button>
       </form>
 
-      {DEMO_MODE ? (
+      {demoHints ? (
         <p className="login-demo">
           <span>{t("login.demo")}</span>
           <button

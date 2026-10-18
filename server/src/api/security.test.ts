@@ -101,6 +101,7 @@ const routes: RouteCase[] = [
   { method: "POST", path: "/api/auth/login", access: "public", ok: 200, body: credentials.reader },
   { method: "POST", path: "/api/auth/card-login", access: "public", ok: 200, body: { cardNumber: "20240001", pin: "reader123" } },
   { method: "POST", path: "/api/auth/card-scan", access: "public", ok: 200, body: { cardNumber: "20240001" } },
+  { method: "GET", path: "/api/auth/demo", access: "public", ok: 200 },
   { method: "GET", path: "/api/auth/me", access: "public", ok: 200 },
   { method: "POST", path: "/api/auth/logout", access: "public", ok: 204, freshSession: true },
   { method: "GET", path: "/api/books", access: "operate", ok: 200 },

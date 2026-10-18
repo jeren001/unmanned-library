@@ -53,6 +53,17 @@ export function cardScan(cardNumber: string) {
   return postLogin("/api/auth/card-scan", { cardNumber: cardNumber.trim() });
 }
 
+/** Whether the server is in demo mode (the flag behind /card-scan). Anything but a clear "yes" counts as no. */
+export async function fetchServerDemoMode() {
+  try {
+    const response = await fetch("/api/auth/demo", { credentials: "same-origin" });
+    const data = (await response.json()) as { demoMode?: unknown };
+    return response.ok && data.demoMode === true;
+  } catch {
+    return false;
+  }
+}
+
 /** i18n key (+ interpolation values) for a failed login. */
 export function loginErrorMessage(error: unknown): { key: string; values?: Record<string, number> } {
   const code = error instanceof LoginError ? error.code : "UNKNOWN";
