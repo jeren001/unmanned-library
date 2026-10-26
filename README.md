@@ -89,7 +89,7 @@ Numbers are from a local single-machine run, not a production benchmark.
 Requires **Node 20+**.
 
 ```bash
-git clone <this repo>
+git clone https://github.com/jeren001/unmanned-library.git
 cd unmanned-library
 npm install
 npm run seed                 # demo data: 3 branches, 300 books, 60 readers, devices
